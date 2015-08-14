@@ -1,0 +1,13 @@
+bin
+.boots
+*.boots
+*.bak
+config.yaml
+pkg
+.gopath
+.vagrant
+perm
+
+builds/
+data/
+bootops
