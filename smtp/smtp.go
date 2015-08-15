@@ -12,7 +12,10 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"strings"
+	"sync/atomic"
 	"time"
+
+	"code.google.com/p/go-uuid/uuid"
 
 	"github.com/influx6/flux"
 	"github.com/op/go-logging"
@@ -21,6 +24,18 @@ import (
 var log = logging.MustGetLogger("flux")
 
 type (
+
+	//Envelope entails the email address and attachments
+	Envelope struct {
+		ID          uuid.UUID
+		Sender      string
+		Receivers   []string
+		AuthData    string
+		AuthType    string
+		AuthRequest string
+		Data        []byte
+		Peer        SMTPPeer
+	}
 
 	//Service defines a service provider
 	Service interface {
@@ -69,7 +84,7 @@ type (
 		ServerName string
 		Protocol   Protocol
 		Addr       net.Addr
-		TLS        *tls.ConnectionState
+		TLS        tls.ConnectionState `yaml:"-" json:"-"`
 	}
 
 	//MetaConfig provides a config struct
@@ -91,13 +106,16 @@ type (
 
 	//SMTPSession provides a base level content handler for smtp sessions from the server
 	SMTPSession struct {
-		base   *SMTPConfig
-		target net.Conn
-		reader *bufio.Reader
-		writer *bufio.Writer
+		base     *SMTPConfig
+		target   net.Conn
+		reader   *bufio.Reader
+		writer   *bufio.Writer
+		envelope *Envelope
 
 		scanner  *bufio.Scanner
 		Timeouts *Fsop
+		closenow int64
+		tlsd     bool
 	}
 
 	//SMTPRecordChannel represents a channel of smtp record
@@ -105,10 +123,11 @@ type (
 
 	//SMTPRecord provides a record struct
 	SMTPRecord struct {
-		Peer    SMTPPeer
-		Packet  []byte
-		Cmd     SMTPCommand
-		Session *SMTPSession
+		Peer     SMTPPeer
+		Packet   []byte
+		Cmd      SMTPCommand
+		Session  *SMTPSession
+		Finished chan struct{}
 	}
 
 	//Fsop provides time details for read/write deadlines
@@ -338,6 +357,11 @@ func (s SMTPProxyConn) Proxy( /*c *ProxyConfig*/ ) error {
 		err := smtpHandlers(&rec, client, session)
 		log.Error("Handling SMTP Request %s", cmd.Action, err)
 
+		if err != nil {
+			session.Reply(502, fmt.Sprintf("Request %s Failed for proxy", cmd.Action))
+		}
+
+		close(rec.Finished)
 	}
 
 	return nil
@@ -372,6 +396,10 @@ func NewSMTPSession(conf *SMTPConfig, target net.Conn) (s *SMTPSession) {
 		target: target,
 		reader: bufio.NewReader(conf.Conn),
 		writer: bufio.NewWriter(conf.Conn),
+		envelope: &Envelope{
+			ID:   uuid.NewUUID(),
+			Peer: conf.Peer,
+		},
 	}
 
 	s.scanner = bufio.NewScanner(s.reader)
@@ -400,7 +428,18 @@ func (s *SMTPSession) RejectClose() {
 func (s *SMTPSession) Close() error {
 	s.writer.Flush()
 	time.Sleep(s.base.Timeouts.CloseTimeout)
+	atomic.StoreInt64(&s.closenow, 1)
+	s.Reset()
+	s.envelope = nil
 	return s.base.Conn.Close()
+}
+
+//Reset resets the session
+func (s *SMTPSession) Reset() {
+	s.envelope = &Envelope{
+		ID:   uuid.NewUUID(),
+		Peer: s.base.Peer,
+	}
 }
 
 func (s *SMTPSession) flush() error {
@@ -472,7 +511,7 @@ func (s *SMTPSession) Serve() SMTPRecordChannel {
 	records := make(SMTPRecordChannel)
 
 	go func() {
-		defer s.Close()
+		// defer s.Close()
 		defer close(records)
 
 		log.Debug("Serving Session for %s", s.base.Hostname)
@@ -480,15 +519,23 @@ func (s *SMTPSession) Serve() SMTPRecordChannel {
 		log.Debug("Sending Welcome for %s", s.base.Hostname)
 
 		for {
+			if atomic.LoadInt64(&s.closenow) > 0 {
+				break
+			}
 
 			for s.scanner.Scan() {
 				pack := s.scanner.Bytes()
-				records <- SMTPRecord{
-					Peer:    s.base.Peer,
-					Packet:  pack,
-					Session: s,
-					Cmd:     parseCommand(pack),
+				rec := SMTPRecord{
+					Peer:     s.base.Peer,
+					Packet:   pack,
+					Session:  s,
+					Cmd:      parseCommand(pack),
+					Finished: make(chan struct{}),
 				}
+
+				records <- rec
+
+				<-rec.Finished
 			}
 
 			err := s.scanner.Err()
@@ -631,22 +678,45 @@ func handleDATA(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 
 	n, err := io.CopyN(buf, reader, int64(proxy.base.MaxSize))
 
-	log.Debug("Data Write Size: %d", n)
+	log.Debug("Data Write Size: %d", n, err)
 	if err == io.EOF || err == nil {
 		proxy.Reply(250, "Thank you.")
 
+		log.Debug("Data Submitted!")
 		datawriter, err := c.Data()
 
+		bu := buf.Bytes()
+
+		if proxy.envelope != nil {
+
+			envl := proxy.envelope
+			envl.Data = append([]byte{}, bu...)
+
+			log.Debug("%+s", envl)
+
+			//jsonify envelope
+			// envljson, err := json.Marshal(envl)
+
+			// if err != nil {
+			// log.Error("json.Mashall fail on envelop", err)
+			// } else {
+			// proxy.recorder.Data(SMTPSensorTypeMail, envl.ID, envljson)
+			// }
+		}
+
 		if err != nil {
 			return err
 		}
 
-		_, err = datawriter.Write(buf.Bytes())
+		_, err = datawriter.Write(bu)
 
 		if err != nil {
 			return err
 		}
 
+		err = datawriter.Close()
+		proxy.Reset()
+		log.Error("Delivered to other end: ", err)
 		return nil
 	}
 
@@ -683,6 +753,14 @@ func handleAUTH(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 		return err
 	}
 
+	// mech := rec.Cmd.Fields[1]
+
+	if proxy.envelope != nil {
+		proxy.envelope.AuthType = rec.Cmd.Fields[1]
+		proxy.envelope.AuthData = msg
+		proxy.envelope.AuthRequest = rec.Cmd.Packet
+	}
+
 	fmt.Fprint(proxy.base.Conn, msg)
 
 	return nil
@@ -706,10 +784,21 @@ func handleQUIT(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 
 	fmt.Fprint(proxy.base.Conn, msg)
 
+	proxy.Close()
+
 	return nil
 }
 
 func handleSTARTTLS(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
+
+	if proxy.tlsd {
+		proxy.Reply(502, "TLS Already Active")
+	}
+
+	if proxy.base.Config == nil {
+		proxy.Reply(502, "TLS Not Supported")
+	}
+
 	id, err := c.Text.Cmd(rec.Cmd.Packet)
 
 	if err != nil {
@@ -719,13 +808,36 @@ func handleSTARTTLS(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 	c.Text.StartResponse(id)
 	defer c.Text.EndResponse(id)
 
-	msg, err := collectClientLines(c.Text)
+	code, msg, err := c.Text.ReadResponse(220)
 
 	if err != nil {
+		proxy.Reply(502, "Not Supported")
 		return err
 	}
 
-	fmt.Fprint(proxy.base.Conn, msg)
+	tlsconn := tls.Server(proxy.base.Conn, proxy.base.Config)
+	proxy.Reply(code, msg)
+
+	if err := tlsconn.Handshake(); err != nil {
+		proxy.Reply(550, "Handshake Error")
+		return err
+	}
+
+	// proxy.Reply(220, "Go Ahead")
+	proxy.Reset()
+
+	proxy.base.Conn.SetDeadline(time.Time{})
+
+	proxy.base.Conn = tlsconn
+	proxy.reader = bufio.NewReader(tlsconn)
+	proxy.writer = bufio.NewWriter(tlsconn)
+	proxy.scanner = bufio.NewScanner(proxy.reader)
+	proxy.tlsd = true
+
+	state := tlsconn.ConnectionState()
+	proxy.base.Peer.TLS = state
+
+	proxy.flush()
 
 	return nil
 }
@@ -821,6 +933,10 @@ func handleMAIL(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 		return err
 	}
 
+	if proxy.envelope != nil {
+		proxy.envelope.Sender = rec.Cmd.Params[1]
+	}
+
 	c.Text.StartResponse(id)
 	defer c.Text.EndResponse(id)
 
@@ -844,6 +960,10 @@ func handleRCPT(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 	c.Text.StartResponse(id)
 	defer c.Text.EndResponse(id)
 
+	if proxy.envelope != nil {
+		proxy.envelope.Receivers = append(proxy.envelope.Receivers, rec.Cmd.Params[1])
+	}
+
 	msg, err := collectClientLines(c.Text)
 
 	if err != nil {
@@ -855,6 +975,27 @@ func handleRCPT(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 }
 
 func handleRSET(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
+	id, err := c.Text.Cmd(rec.Cmd.Packet)
+
+	if err != nil {
+		return err
+	}
+
+	c.Text.StartResponse(id)
+	defer c.Text.EndResponse(id)
+
+	msg, err := collectClientLines(c.Text)
+
+	if err != nil {
+		return err
+	}
+
+	proxy.Reset()
+	fmt.Fprint(proxy.base.Conn, msg)
+	return nil
+}
+
+func handleGeneric(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 	id, err := c.Text.Cmd(rec.Cmd.Packet)
 
 	if err != nil {
