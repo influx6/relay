@@ -15,6 +15,11 @@ import (
 var DefaultConfig = Config{
 	Addr:   ":8080",
 	UseTLS: false,
+	Folders: Folders{
+		Assets: "./assets",
+		Models: "./models",
+		Views:  "./views",
+	},
 }
 
 //TLSConfig provides a base config for tls configuration
@@ -45,11 +50,19 @@ func (t *TLSConfig) UnmarshalYaml(unmarshal func(interface{}) error) error {
 	return nil
 }
 
+// Folders provide a configuration for app-used folders
+type Folders struct {
+	Assets string
+	Models string
+	Views  string
+}
+
 // Config provides configuration for Afro
 type Config struct {
-	Addr   string
-	UseTLS bool
-	C      TLSConfig
+	Addr    string
+	UseTLS  bool
+	C       TLSConfig
+	Folders Folders
 }
 
 // NewConfig returns a new configuration file
