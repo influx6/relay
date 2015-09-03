@@ -15,21 +15,33 @@ import (
 var DefaultConfig = Config{
 	Addr:   ":8080",
 	UseTLS: false,
-	Certs:  TLSConfig{},
 }
 
 //TLSConfig provides a base config for tls configuration
 type TLSConfig struct {
-	conf *tls.Config
-	key  string
-	cert string
+	Cert *tls.Config
+}
+
+type tlsconf struct {
+	Key  string
+	Cert string
 }
 
 // UnmarshalYaml unmarshalls the incoming data for use
 func (t *TLSConfig) UnmarshalYaml(unmarshal func(interface{}) error) error {
-	// var k, c string
+	to := tlsconf{}
 
-	// if err := unmarshal()
+	if err := unmarshal(&to); err != nil {
+		return err
+	}
+
+	co, err := relay.LoadTLS(to.Cert, to.Key)
+
+	if err != nil {
+		return err
+	}
+
+	t.Cert = co
 	return nil
 }
 
@@ -37,7 +49,7 @@ func (t *TLSConfig) UnmarshalYaml(unmarshal func(interface{}) error) error {
 type Config struct {
 	Addr   string
 	UseTLS bool
-	Certs  TLSConfig
+	C      TLSConfig
 }
 
 // NewConfig returns a new configuration file
@@ -86,20 +98,32 @@ func NewEngine(c *Config) *Engine {
 }
 
 // Serve serves the app and configuration and loads the routes and serivices settings
-func (a *Engine) Serve() {
+func (a *Engine) Serve() error {
 	var err error
 	var li net.Listener
 
-	if a.config.UseTLS && a.config.Certs.conf != nil {
-		_, li, err = relay.CreateTLS(a.config.Addr, a.config.Certs.conf, a)
+	if a.config.UseTLS && a.config.C.Cert != nil {
+		_, li, err = relay.CreateTLS(a.config.Addr, a.config.C.Cert, a)
 	} else {
 		_, li, err = relay.CreateHTTP(a.config.Addr, a)
 	}
 
 	if err != nil {
 		log.Fatalf("Server failed to start: %+s", err.Error())
-		return
+		return err
 	}
 
 	a.li = li
+
+	return nil
+}
+
+// Addr returns the address of the app
+func (a *Engine) Addr() net.Addr {
+	return a.li.Addr()
+}
+
+// Close closes and returns an error of the internal listener
+func (a *Engine) Close() error {
+	return a.li.Close()
 }
