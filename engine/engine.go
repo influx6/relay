@@ -14,7 +14,6 @@ import (
 // DefaultConfig provides a default configuration for the app
 var DefaultConfig = Config{
 	Addr:    ":8080",
-	UseTLS:  false,
 	Folders: Folders{},
 }
 
@@ -67,7 +66,6 @@ func (t *Folders) UnmarshalYaml(unmarshal func(interface{}) error) error {
 // Config provides configuration for Afro
 type Config struct {
 	Addr    string    `yaml:"addr"`
-	UseTLS  bool      `yaml:"usetls"`
 	C       TLSConfig `yaml:"tls"`
 	Folders Folders   `yaml:"folders"`
 }
@@ -124,7 +122,7 @@ func (a *Engine) Serve() error {
 	var err error
 	var li net.Listener
 
-	if a.config.UseTLS && a.config.C.Certs != nil {
+	if a.config.C.Certs != nil {
 		_, li, err = relay.CreateTLS(a.config.Addr, a.config.C.Certs, a)
 	} else {
 		_, li, err = relay.CreateHTTP(a.config.Addr, a)
