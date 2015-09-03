@@ -89,6 +89,7 @@ func (c *Config) Load(file string) error {
 	conf := Config{}
 	err = yaml.Unmarshal(data, &conf)
 
+	log.Printf("load: %+s", conf)
 	if err != nil {
 		return err
 	}
