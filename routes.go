@@ -57,16 +57,18 @@ func BuildRoutes(failed http.HandlerFunc, panic PanicHandler) *Routes {
 func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	flux.RecoveryHandler("Route:ServeHTTP", func() error {
 		r.ro.RLock()
+
+		mod := strings.ToLower(req.Method)
+
 		for _, no := range r.routes {
-			state, params := no.Validate(req.URL.Path)
-			if !state {
-				continue
-			}
-			if no.method != "" && strings.ToLower(no.method) != strings.ToLower(req.Method) {
+			if no.method == "" || strings.ToLower(no.method) == mod {
+				state, params := no.Validate(req.URL.Path)
+				if !state {
+					continue
+				}
+				r.wrap(no, res, req, flux.Collector(params))
 				break
 			}
-			r.wrap(no, res, req, flux.Collector(params))
-			return nil
 		}
 		r.ro.RUnlock()
 		r.doFail(res, req, nil)
@@ -145,17 +147,17 @@ func (r *Routes) GET(pattern string, h RHandler) {
 }
 
 // Add adds a route into the sets of routes, method can be "" to allow all methods to be handled
-func (r *Routes) Add(method, pattern string, h RHandler) {
-	r.ro.Lock()
-	defer r.ro.Unlock()
-	if _, ok := r.added[pattern]; !ok {
-		r.added[pattern] = len(r.routes)
-		r.routes = append(r.routes, &Route{
-			ClassicMatchMux: reggy.CreateClassic(pattern),
-			handler:         h,
-			method:          method,
-		})
-	}
+func (r *Routes) Add(mo, pattern string, h RHandler) {
+	// r.ro.Lock()
+	// defer r.ro.Unlock()
+	// if _, ok := r.added[pattern]; !ok {
+	// 	r.added[pattern] = len(r.routes)
+	r.routes = append(r.routes, &Route{
+		ClassicMatchMux: reggy.CreateClassic(pattern),
+		handler:         h,
+		method:          mo,
+	})
+	// }
 }
 
 func (r *Routes) recover(res http.ResponseWriter, req *http.Request) {

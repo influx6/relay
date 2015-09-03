@@ -50,7 +50,6 @@ type HTTPHandler func(*HTTPRequest)
 
 // HTTPort provides a port for handling http-type request
 type HTTPort struct {
-	flux.Reactor
 	codec   HTTPCodec
 	handler HTTPHandler
 }

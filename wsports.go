@@ -144,10 +144,11 @@ type SocketHubHandler func(*SocketHub, *WebsocketMessage)
 
 // SocketHub provides a central command for websocket message handling,its the base struct through which different websocket messaging procedures can be implemented on, it provides a go-routine approach,by taking each new websocket connection,stashing it then receiving data from it for processing
 type SocketHub struct {
-	flux.Reactor
 	so      sync.RWMutex
 	sockets SocketStore
 	handler SocketHubHandler
+	closer  chan bool
+	closed  bool
 }
 
 // NewSocketHub returns a new SocketHub instance,allows the passing of a codec for encoding and decoding data
@@ -157,6 +158,20 @@ func NewSocketHub(fx SocketHubHandler) (sh *SocketHub) {
 		handler: fx,
 	}
 	return
+}
+
+// Close closes the hub
+func (s *SocketHub) Close() {
+	if s.closed {
+		return
+	}
+	s.closed = true
+	close(s.closer)
+}
+
+// CloseNotify provides a means of checking the close state of the hub
+func (s *SocketHub) CloseNotify() <-chan bool {
+	return s.closer
 }
 
 // AddConnection adds a new socket connection
