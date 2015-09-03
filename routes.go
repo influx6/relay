@@ -57,9 +57,7 @@ func BuildRoutes(failed http.HandlerFunc, panic PanicHandler) *Routes {
 func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	flux.RecoveryHandler("Route:ServeHTTP", func() error {
 		r.ro.RLock()
-
 		mod := strings.ToLower(req.Method)
-
 		for _, no := range r.routes {
 			if no.method == "" || strings.ToLower(no.method) == mod {
 				state, params := no.Validate(req.URL.Path)
