@@ -676,47 +676,34 @@ func handleDATA(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 
 	reader := textproto.NewReader(proxy.reader).DotReader()
 
-	n, err := io.CopyN(buf, reader, int64(proxy.base.MaxSize))
+	_, err := io.CopyN(buf, reader, int64(proxy.base.MaxSize))
 
-	log.Debug("Data Write Size: %d", n, err)
 	if err == io.EOF || err == nil {
-		proxy.Reply(250, "Thank you.")
 
-		log.Debug("Data Submitted!")
-		datawriter, err := c.Data()
+		proxy.Reply(250, "Thank you.")
 
 		bu := buf.Bytes()
 
-		if proxy.envelope != nil {
-
-			envl := proxy.envelope
-			envl.Data = append([]byte{}, bu...)
-
-			log.Debug("%+s", envl)
-
-			//jsonify envelope
-			// envljson, err := json.Marshal(envl)
-
-			// if err != nil {
-			// log.Error("json.Mashall fail on envelop", err)
-			// } else {
-			// proxy.recorder.Data(SMTPSensorTypeMail, envl.ID, envljson)
-			// }
-		}
+		datawriter, err := c.Data()
 
 		if err != nil {
 			return err
 		}
 
-		_, err = datawriter.Write(bu)
+		n, err := datawriter.Write(bu)
+		log.Debug("Data Submitted total written %d!", n)
 
 		if err != nil {
 			return err
 		}
 
 		err = datawriter.Close()
+
+		if err != nil {
+			return err
+		}
+
 		proxy.Reset()
-		log.Error("Delivered to other end: ", err)
 		return nil
 	}
 
@@ -784,6 +771,7 @@ func handleQUIT(rec *SMTPRecord, c *smtp.Client, proxy *SMTPSession) error {
 
 	fmt.Fprint(proxy.base.Conn, msg)
 
+	c.Close()
 	proxy.Close()
 
 	return nil
