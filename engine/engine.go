@@ -24,12 +24,14 @@ var DefaultConfig = Config{
 
 //TLSConfig provides a base config for tls configuration
 type TLSConfig struct {
-	Cert *tls.Config
+	Certs *tls.Config
+	Key   string `yaml:"key"`
+	Cert  string `yaml:"cert"`
 }
 
 type tlsconf struct {
-	Key  string
-	Cert string
+	Key  string `yaml:"key"`
+	Cert string `yaml:"cert"`
 }
 
 // UnmarshalYaml unmarshalls the incoming data for use
@@ -46,23 +48,23 @@ func (t *TLSConfig) UnmarshalYaml(unmarshal func(interface{}) error) error {
 		return err
 	}
 
-	t.Cert = co
+	t.Certs = co
 	return nil
 }
 
 // Folders provide a configuration for app-used folders
 type Folders struct {
-	Assets string
-	Models string
-	Views  string
+	Assets string `yaml:"assets"`
+	Models string `yaml:"models"`
+	Views  string `yaml:"views"`
 }
 
 // Config provides configuration for Afro
 type Config struct {
-	Addr    string
-	UseTLS  bool
-	C       TLSConfig
-	Folders Folders
+	Addr    string    `yaml:"addr"`
+	UseTLS  bool      `yaml:"usetls"`
+	C       TLSConfig `yaml:"tls"`
+	Folders Folders   `yaml:"folders"`
 }
 
 // NewConfig returns a new configuration file
@@ -115,8 +117,8 @@ func (a *Engine) Serve() error {
 	var err error
 	var li net.Listener
 
-	if a.config.UseTLS && a.config.C.Cert != nil {
-		_, li, err = relay.CreateTLS(a.config.Addr, a.config.C.Cert, a)
+	if a.config.UseTLS && a.config.C.Certs != nil {
+		_, li, err = relay.CreateTLS(a.config.Addr, a.config.C.Certs, a)
 	} else {
 		_, li, err = relay.CreateHTTP(a.config.Addr, a)
 	}
