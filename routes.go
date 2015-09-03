@@ -12,10 +12,17 @@ import (
 // RHandler provides a custom route handler for http request with params
 type RHandler func(http.ResponseWriter, *http.Request, flux.Collector)
 
-//WrapRHandler wraps http handler into a router RHandler
-func WrapRHandler(r http.HandlerFunc) RHandler {
+//WrapRouteHandlerFunc wraps http handler into a router RHandler
+func WrapRouteHandlerFunc(r http.HandlerFunc) RHandler {
 	return func(res http.ResponseWriter, req *http.Request, _ flux.Collector) {
 		r(res, req)
+	}
+}
+
+//WrapRouteHandler wraps http handler into a router RHandler
+func WrapRouteHandler(r http.Handler) RHandler {
+	return func(res http.ResponseWriter, req *http.Request, _ flux.Collector) {
+		r.ServeHTTP(res, req)
 	}
 }
 
