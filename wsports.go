@@ -178,8 +178,22 @@ func (s *SocketHub) AddConnection(ws *SocketWorker) {
 	go s.manageSocket(ws)
 }
 
-// manageSocket takes a socket and spawns a go-routine to
-//manage the operations of the socket,getting the data and delivery them as WebsocketRequests
+// SocketWorkerHandler provides a function type that encapsulates the socket workers
+type SocketWorkerHandler func(*SocketWorker)
+
+// Distribute propagates through the set of defined websocket workers and
+//calls a function on it
+func (s *SocketHub) Distribute(hsx SocketWorkerHandler, except *SocketWorker) {
+	s.so.RLock()
+	for wo := range s.sockets {
+		if wo != except {
+			go hsx(wo)
+		}
+	}
+	s.so.RUnlock()
+}
+
+// manageSocket takes a socket and spawns a go-routine to manage the operations of the socket,getting the data and delivery them as WebsocketRequests
 func (s *SocketHub) manageSocket(ws *SocketWorker) {
 	defer func() {
 		s.so.Lock()
@@ -224,27 +238,10 @@ func (ws *WebsocketPort) Handle(res http.ResponseWriter, req *http.Request, para
 		Res:    res,
 		Params: params,
 	}, ws.codec))
-	// ws.Send(NewSocketWorker(&Websocket{
-	// 	Conn:   conn,
-	// 	Req:    req,
-	// 	Res:    res,
-	// 	Params: params,
-	// }, ws.codec))
 }
-
-// SocketPortHandler is a function type for the *SocketWorker
-// type SocketPortHandler func(*WebsocketPort, *SocketWorker)
 
 //SocketHandler provides an handler type without the port option
 type SocketHandler func(*SocketWorker)
-
-//WrapSocketHandler wraps and returns a HTTPReactorHandler
-// func WrapSocketHandler(hx SocketHandler) SocketPortHandler {
-// 	return func(f *WebsocketPort, sw *SocketWorker) {
-// 		hx(sw)
-// 		f.Reply(sw)
-// 	}
-// }
 
 // NewWebsocketPort returns a new websocket port
 func NewWebsocketPort(codec SocketCodec, upgrader *websocket.Upgrader, headers http.Header, hs SocketHandler) (ws *WebsocketPort) {

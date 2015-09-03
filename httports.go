@@ -59,17 +59,7 @@ type HTTPort struct {
 func (h *HTTPort) Handle(res http.ResponseWriter, req *http.Request, params flux.Collector) {
 	rwq := NewHTTPRequest(req, res, params, h.codec)
 	h.handler(rwq)
-	// h.handler(h, rwq)
-	// h.Send(rwq)
 }
-
-//WrapHTTPHandler wraps and returns a HTTPReactorHandler
-// func WrapHTTPHandler(hx HTTPHandler) HTTPReactorHandler {
-// 	return func(f *HTTPort, req *HTTPRequest) {
-// 		hx(req)
-// 		f.Reply(req)
-// 	}
-// }
 
 // NewHTTPort returns a new http port
 func NewHTTPort(codec HTTPCodec, h HTTPHandler) (hp *HTTPort) {
