@@ -13,13 +13,9 @@ import (
 
 // DefaultConfig provides a default configuration for the app
 var DefaultConfig = Config{
-	Addr:   ":8080",
-	UseTLS: false,
-	Folders: Folders{
-		Assets: "./assets",
-		Models: "./models",
-		Views:  "./views",
-	},
+	Addr:    ":8080",
+	UseTLS:  false,
+	Folders: Folders{},
 }
 
 //TLSConfig provides a base config for tls configuration
@@ -57,6 +53,15 @@ type Folders struct {
 	Assets string `yaml:"assets"`
 	Models string `yaml:"models"`
 	Views  string `yaml:"views"`
+}
+
+// UnmarshalYaml unmarshalls the incoming data for use
+func (t *Folders) UnmarshalYaml(unmarshal func(interface{}) error) error {
+	if err := unmarshal(t); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Config provides configuration for Afro
