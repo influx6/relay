@@ -131,7 +131,6 @@ func (s *SocketWorker) manage() {
 				payload: do,
 				mtype:   tp,
 				Socket:  s.wo,
-				// Worker:  s,
 			})
 		}
 	}
@@ -141,22 +140,21 @@ func (s *SocketWorker) manage() {
 type SocketStore map[*SocketWorker]bool
 
 // SocketHubHandler provides a function type that encapsulates the socket hub message operations
-type SocketHubHandler func(*SocketHub, error, *WebsocketMessage)
+type SocketHubHandler func(*SocketHub, *WebsocketMessage)
 
 // SocketHub provides a central command for websocket message handling,its the base struct through which different websocket messaging procedures can be implemented on, it provides a go-routine approach,by taking each new websocket connection,stashing it then receiving data from it for processing
 type SocketHub struct {
 	flux.Reactor
 	so      sync.RWMutex
 	sockets SocketStore
+	handler SocketHubHandler
 }
 
 // NewSocketHub returns a new SocketHub instance,allows the passing of a codec for encoding and decoding data
 func NewSocketHub(fx SocketHubHandler) (sh *SocketHub) {
 	sh = &SocketHub{
 		sockets: make(SocketStore),
-		Reactor: flux.Reactive(func(r flux.Reactor, err error, d interface{}) {
-			fx(sh, err, d.(*WebsocketMessage))
-		}),
+		handler: fx,
 	}
 	return
 }
@@ -198,7 +196,7 @@ func (s *SocketHub) manageSocket(ws *SocketWorker) {
 			if !ok {
 				return
 			}
-			s.Send(data)
+			go s.handler(s, data.(*WebsocketMessage))
 		}
 	}
 }
