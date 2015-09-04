@@ -54,15 +54,6 @@ type Folders struct {
 	Views  string `yaml:"views"`
 }
 
-// UnmarshalYaml unmarshalls the incoming data for use
-func (t *Folders) UnmarshalYaml(unmarshal func(interface{}) error) error {
-	if err := unmarshal(t); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Config provides configuration for Afro
 type Config struct {
 	Addr    string    `yaml:"addr"`
@@ -94,12 +85,6 @@ func (c *Config) Load(file string) error {
 	}
 
 	return mergo.MergeWithOverwrite(c, conf)
-}
-
-// UnmarshalYAML unmarshals and sets the configuration options
-func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
-
-	return nil
 }
 
 //Engine provides a base luncher for a service
