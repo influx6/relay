@@ -39,7 +39,7 @@ var (
 
 //LoadTLS loads a tls.Config from a key and cert file path
 func LoadTLS(cert, key string) (*tls.Config, error) {
-	var config *tls.Config
+	var config = &tls.Config{}
 	config.Certificates = make([]tls.Certificate, 1)
 
 	c, err := tls.LoadX509KeyPair(cert, key)
