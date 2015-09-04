@@ -24,13 +24,20 @@ type TLSConfig struct {
 	Cert  string `yaml:"cert"`
 }
 
+type tlsconf struct {
+	Key  string `yaml:"key"`
+	Cert string `yaml:"cert"`
+}
+
 // UnmarshalYaml unmarshalls the incoming data for use
 func (t *TLSConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := unmarshal(t); err != nil {
+	toc := tlsconf{}
+
+	if err := unmarshal(&toc); err != nil {
 		return err
 	}
 
-	co, err := relay.LoadTLS(t.Cert, t.Key)
+	co, err := relay.LoadTLS(toc.Cert, toc.Key)
 
 	if err != nil {
 		return err
