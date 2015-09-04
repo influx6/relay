@@ -6,50 +6,45 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var defaultConfig = &ControllerConfig{
-	Headers: http.Header(map[string][]string{
-		"Access-Control-Allow-Credentials": []string{"true"},
-		"Access-Control-Allow-Origin":      []string{"*"},
-	}),
-	Upgrader: &websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-	},
-	HttpCodec:   BasicHTTPCodec(),
-	SocketCodec: BasicSocketCodec(),
-}
+var dheaders = http.Header(map[string][]string{
+	"Access-Control-Allow-Credentials": []string{"true"},
+	"Access-Control-Allow-Origin":      []string{"*"},
+})
 
-//ControllerConfig provides a configuration for websockets
-type ControllerConfig struct {
-	Headers     http.Header
-	Upgrader    *websocket.Upgrader
-	HttpCodec   HTTPCodec
-	SocketCodec SocketCodec
+var dupgrade = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
 }
 
 // Controller provides a nice overlay on top of the behaviour of a requestlevel
 type Controller struct {
-	config *ControllerConfig
 }
 
 // NewController returns a controller with the default config settings
 func NewController() *Controller {
-	return BuildController(defaultConfig)
-}
-
-// BuildController returns an instance of controller
-func BuildController(config *ControllerConfig) *Controller {
-	return &Controller{config: config}
+	return &Controller{}
 }
 
 // Websocket returns a WebsocketPort that provides a underline buffering strategy to control
 //socket requests handling throttling to a specific address
 func (c *Controller) Websocket(fx SocketHandler) *WebsocketPort {
-	return NewWebsocketPort(c.config.SocketCodec, c.config.Upgrader, c.config.Headers, fx)
+	return c.WebsocketAction(fx, BasicSocketCodec(), dheaders, dupgrade)
 }
 
 // HTTP returns a HTTPort that provides a underline buffering strategy to control
 //requests handling throttling to a specifc address
 func (c *Controller) HTTP(fx HTTPHandler) *HTTPort {
-	return NewHTTPort(c.config.HttpCodec, fx)
+	return c.HTTPAction(fx, BasicHTTPCodec())
+}
+
+// WebsocketAction returns a WebsocketPort that provides a underline buffering strategy to control
+//socket requests handling throttling to a specific address
+func (c *Controller) WebsocketAction(fx SocketHandler, codec SocketCodec, headers http.Header, up websocket.Upgrader) *WebsocketPort {
+	return NewWebsocketPort(codec, &up, headers, fx)
+}
+
+// HTTPAction returns a HTTPort that provides a underline buffering strategy to control
+//requests handling throttling to a specifc address
+func (c *Controller) HTTPAction(fx HTTPHandler, codec HTTPCodec) *HTTPort {
+	return NewHTTPort(codec, fx)
 }
