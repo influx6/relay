@@ -33,7 +33,7 @@ type WebsocketMessage struct {
 }
 
 // Message returns the data of the socket
-func (m *WebsocketMessage) Message() ([]byte, error) {
+func (m *WebsocketMessage) Message() (interface{}, error) {
 	return m.codec.Decode(m.mtype, m.payload)
 }
 

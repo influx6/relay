@@ -100,9 +100,9 @@ func loadData(r *HTTPRequest) (*Message, error) {
 }
 
 // Encode encodes and writes the payload and writes it appropriately to the writer
-func (b *BasicHTTPEncoder) Encode(r *HTTPRequest, payload []byte) (int, error) {
+func (b *BasicHTTPEncoder) Encode(r *HTTPRequest, payload interface{}) (int, error) {
 	setUpHeadings(r)
-	return r.Res.Write(payload)
+	return r.Res.Write(payload.([]byte))
 }
 
 // BasicHTTPDecoder provides a basic http encoder for response to http-requests

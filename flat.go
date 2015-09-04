@@ -7,8 +7,8 @@ type FlatChains interface {
 	ChainHandleFunc(h http.HandlerFunc) FlatChains
 	ChainHandler(h http.Handler) FlatChains
 	Handle(http.ResponseWriter, *http.Request, Collector)
-	ReChain(FlatChains) FlatChains
-	Chain(FlatChains)
+	Chain(FlatChains) FlatChains
+	NChain(FlatChains) FlatChains
 }
 
 // NextHandler provides next call for flat chains
@@ -37,21 +37,24 @@ func NewFlatChain(fx FlatHandler) *FlatChain {
 	}
 }
 
-// Chain sets the next flat chains else passes it down to the last chain to set as next chain
-func (r *FlatChain) Chain(rx FlatChains) {
+// Chain sets the next flat chains else passes it down to the last chain to set as next chain,returning itself
+func (r *FlatChain) Chain(rx FlatChains) FlatChains {
 	if r.next == nil {
 		r.next = rx
-		return
+	} else {
+		r.next.Chain(rx)
 	}
-	r.next.Chain(rx)
+	return r
 }
 
-/*ReChain uses Chain underneath and returns itself as the new chain (useful for multibinding chains but still wanting the root as the target) eg
-  Web().ReChain(Socket).Rechain(Block) => Web(chain)
-*/
-func (r *FlatChain) ReChain(rx FlatChains) FlatChains {
-	r.Chain(rx)
-	return r
+// NChain sets the next flat chains else passes it down to the last chain to set as next chain,returning the the supplied chain
+func (r *FlatChain) NChain(rx FlatChains) FlatChains {
+	if r.next == nil {
+		r.next = rx
+		return rx
+	}
+
+	return r.next.NChain(rx)
 }
 
 // Handle calls the next chain if any
