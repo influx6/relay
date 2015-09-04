@@ -37,6 +37,10 @@ func (t *TLSConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return err
 	}
 
+	if toc.Cert == "" || toc.Key == "" {
+		return nil
+	}
+
 	co, err := relay.LoadTLS(toc.Cert, toc.Key)
 
 	if err != nil {
