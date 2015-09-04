@@ -10,25 +10,25 @@ import (
 )
 
 // RHandler provides a custom route handler for http request with params
-type RHandler func(http.ResponseWriter, *http.Request, flux.Collector)
+type RHandler func(http.ResponseWriter, *http.Request, Collector)
 
 //WrapRouteHandlerFunc wraps http handler into a router RHandler
 func WrapRouteHandlerFunc(r http.HandlerFunc) RHandler {
-	return func(res http.ResponseWriter, req *http.Request, _ flux.Collector) {
+	return func(res http.ResponseWriter, req *http.Request, _ Collector) {
 		r(res, req)
 	}
 }
 
 //WrapRouteHandler wraps http handler into a router RHandler
 func WrapRouteHandler(r http.Handler) RHandler {
-	return func(res http.ResponseWriter, req *http.Request, _ flux.Collector) {
+	return func(res http.ResponseWriter, req *http.Request, _ Collector) {
 		r.ServeHTTP(res, req)
 	}
 }
 
 // Routable provides an interface for handling structs that accept routing
 type Routable interface {
-	Handle(http.ResponseWriter, *http.Request, flux.Collector)
+	Handle(http.ResponseWriter, *http.Request, Collector)
 }
 
 //Route define a specific route with its handler
@@ -79,7 +79,7 @@ func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 				if !state {
 					continue
 				}
-				r.wrap(no, res, req, flux.Collector(params))
+				r.wrap(no, res, req, Collector(params))
 				// break
 				return nil
 			}
@@ -182,7 +182,7 @@ func (r *Routes) recover(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Routes) doFail(res http.ResponseWriter, req *http.Request, ps flux.Collector) {
+func (r *Routes) doFail(res http.ResponseWriter, req *http.Request, ps Collector) {
 	if r.FailHandler == nil {
 		return
 	}
@@ -190,7 +190,7 @@ func (r *Routes) doFail(res http.ResponseWriter, req *http.Request, ps flux.Coll
 	r.FailHandler(res, req)
 }
 
-func (r *Routes) wrap(rw *Route, res http.ResponseWriter, req *http.Request, ps flux.Collector) {
+func (r *Routes) wrap(rw *Route, res http.ResponseWriter, req *http.Request, ps Collector) {
 	defer r.recover(res, req)
 	rw.handler(res, req, ps)
 }

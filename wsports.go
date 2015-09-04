@@ -20,7 +20,7 @@ type Websocket struct {
 	Conn   *websocket.Conn
 	Req    *http.Request
 	Res    http.ResponseWriter
-	Params flux.Collector
+	Params Collector
 }
 
 // WebsocketMessage provides small abstraction for processing a message
@@ -232,7 +232,7 @@ func (s *SocketHub) manageSocket(ws *SocketWorker) {
 
 // WebsocketPort provides a websocket port,handling websocket connection
 type WebsocketPort struct {
-	flux.Reactor
+	FlatChains
 	codec   SocketCodec
 	upgrade *websocket.Upgrader
 	headers http.Header
@@ -240,7 +240,8 @@ type WebsocketPort struct {
 }
 
 // Handle handles the reception of http request and returns a HTTPRequest object
-func (ws *WebsocketPort) Handle(res http.ResponseWriter, req *http.Request, params flux.Collector) {
+func (ws *WebsocketPort) Handle(res http.ResponseWriter, req *http.Request, params Collector) {
+	defer ws.FlatChains.Handle(res, req, params)
 	conn, err := ws.upgrade.Upgrade(res, req, ws.headers)
 
 	if err != nil {
@@ -261,10 +262,11 @@ type SocketHandler func(*SocketWorker)
 // NewWebsocketPort returns a new websocket port
 func NewWebsocketPort(codec SocketCodec, upgrader *websocket.Upgrader, headers http.Header, hs SocketHandler) (ws *WebsocketPort) {
 	ws = &WebsocketPort{
-		codec:   codec,
-		headers: headers,
-		upgrade: upgrader,
-		handle:  hs,
+		FlatChains: FlatChainIdentity(),
+		codec:      codec,
+		headers:    headers,
+		upgrade:    upgrader,
+		handle:     hs,
 	}
 	return
 }

@@ -3,8 +3,6 @@ package relay
 import (
 	"errors"
 	"net/http"
-
-	"github.com/influx6/flux"
 )
 
 // ErrNotHTTPParameter is returned when an HTTPort receives a wrong interface type
@@ -15,11 +13,11 @@ type HTTPRequest struct {
 	codec  HTTPCodec
 	Req    *http.Request
 	Res    ResponseWriter
-	Params flux.Collector
+	Params Collector
 }
 
 // NewHTTPRequest returns a new HTTPMessage instance
-func NewHTTPRequest(req *http.Request, res http.ResponseWriter, params flux.Collector, codec HTTPCodec) *HTTPRequest {
+func NewHTTPRequest(req *http.Request, res http.ResponseWriter, params Collector, codec HTTPCodec) *HTTPRequest {
 	return &HTTPRequest{
 		Req:    req,
 		Res:    NewResponseWriter(res),
@@ -50,21 +48,24 @@ type HTTPHandler func(*HTTPRequest)
 
 // HTTPort provides a port for handling http-type request
 type HTTPort struct {
+	FlatChains
 	codec   HTTPCodec
 	handler HTTPHandler
 }
 
 // Handle handles the reception of http request and returns a HTTPRequest object
-func (h *HTTPort) Handle(res http.ResponseWriter, req *http.Request, params flux.Collector) {
+func (h *HTTPort) Handle(res http.ResponseWriter, req *http.Request, params Collector) {
 	rwq := NewHTTPRequest(req, res, params, h.codec)
 	h.handler(rwq)
+	h.FlatChains.Handle(res, req, params)
 }
 
 // NewHTTPort returns a new http port
 func NewHTTPort(codec HTTPCodec, h HTTPHandler) (hp *HTTPort) {
 	hp = &HTTPort{
-		codec:   codec,
-		handler: h,
+		FlatChains: FlatChainIdentity(),
+		codec:      codec,
+		handler:    h,
 	}
 	return
 }
