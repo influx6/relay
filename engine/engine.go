@@ -30,10 +30,8 @@ type tlsconf struct {
 }
 
 // UnmarshalYaml unmarshalls the incoming data for use
-func (t *TLSConfig) UnmarshalYaml(unmarshal func(interface{}) error) error {
+func (t *TLSConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	toc := tlsconf{}
-
-	log.Println("co: %+s", toc)
 
 	if err := unmarshal(&toc); err != nil {
 		return err
