@@ -71,6 +71,7 @@ func BuildRoutes(failed http.HandlerFunc, panic PanicHandler) *Routes {
 func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	flux.RecoveryHandler("Route:ServeHTTP", func() error {
 		r.ro.RLock()
+		defer r.ro.RUnlock()
 		mod := strings.ToLower(req.Method)
 		for _, no := range r.routes {
 			if no.method == "" || strings.ToLower(no.method) == mod {
@@ -79,10 +80,10 @@ func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 					continue
 				}
 				r.wrap(no, res, req, flux.Collector(params))
-				break
+				// break
+				return nil
 			}
 		}
-		r.ro.RUnlock()
 		r.doFail(res, req, nil)
 		return nil
 	})
@@ -160,8 +161,8 @@ func (r *Routes) GET(pattern string, h RHandler) {
 
 // Add adds a route into the sets of routes, method can be "" to allow all methods to be handled
 func (r *Routes) Add(mo, pattern string, h RHandler) {
-	// r.ro.Lock()
-	// defer r.ro.Unlock()
+	r.ro.Lock()
+	defer r.ro.Unlock()
 	// if _, ok := r.added[pattern]; !ok {
 	// 	r.added[pattern] = len(r.routes)
 	r.routes = append(r.routes, &Route{

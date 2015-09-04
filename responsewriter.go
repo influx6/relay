@@ -54,6 +54,9 @@ func (rw *responseWriter) WritePayload(c int, p []byte) error {
 
 // WriteHeader writes the status code for the http response
 func (rw *responseWriter) WriteHeader(c int) {
+	if rw.Written() {
+		return
+	}
 	rw.status = c
 	rw.w.WriteHeader(c)
 }
