@@ -31,13 +31,15 @@ type tlsconf struct {
 
 // UnmarshalYaml unmarshalls the incoming data for use
 func (t *TLSConfig) UnmarshalYaml(unmarshal func(interface{}) error) error {
-	to := tlsconf{}
+	toc := tlsconf{}
 
-	if err := unmarshal(&to); err != nil {
+	log.Println("co: %+s", toc)
+
+	if err := unmarshal(&toc); err != nil {
 		return err
 	}
 
-	co, err := relay.LoadTLS(to.Cert, to.Key)
+	co, err := relay.LoadTLS(toc.Cert, toc.Key)
 
 	if err != nil {
 		return err
@@ -77,8 +79,6 @@ func (c *Config) Load(file string) error {
 
 	conf := Config{}
 	err = yaml.Unmarshal(data, &conf)
-
-	log.Printf("load: %+s ", conf)
 
 	if err != nil {
 		return err
