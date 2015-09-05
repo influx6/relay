@@ -4,6 +4,12 @@ package relay
 
 // Encoders accept interface{} as the data type because this allows flexible data messages to be constructed without restrictions
 
+//HTTPCodec provides a interface define method for custom message formats
+type HTTPCodec interface {
+	HTTPEncoder
+	HTTPDecoder
+}
+
 //HTTPEncoder takes an inteface and encodes it into a []byte slice
 type HTTPEncoder interface {
 	Encode(*HTTPRequest, interface{}) (int, error)
@@ -51,10 +57,15 @@ func NewHTTPDecoder(fx HTTPDecodeHandler) HTTPDecoder {
 	return &decodeBuild{fx}
 }
 
-//HTTPCodec provides a interface define method for custom message formats
-type HTTPCodec interface {
+// httpCodec represents a generic http codec
+type httpCodec struct {
 	HTTPEncoder
 	HTTPDecoder
+}
+
+// NewHTTPCodec returns a new http codec
+func NewHTTPCodec(e HTTPEncoder, d HTTPDecoder) HTTPCodec {
+	return &httpCodec{e, d}
 }
 
 //SocketEncoder takes an the arguments and encodes it with its own given operation into a acceptable format for the websocket

@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/influx6/ds"
+	"github.com/influx6/reggy"
 )
 
 var dheaders = http.Header(map[string][]string{
@@ -16,13 +18,31 @@ var dupgrade = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+type portnet struct {
+	id   string
+	port PortHandler
+}
+
+type netport struct {
+	path string
+	port PortHandler
+}
+
 // Controller provides a nice overlay on top of the behaviour of a requestlevel
 type Controller struct {
+	router *Routes
+	ports  ds.Sets
+	tag    string
 }
 
 // NewController returns a controller with the default config settings
-func NewController() *Controller {
-	return &Controller{}
+func NewController(name string) *Controller {
+	name = reggy.TrimSlashes(name)
+	return &Controller{
+		tag:    name,
+		ports:  ds.SafeSet(),
+		router: NewRoutes(),
+	}
 }
 
 // Websocket returns a WebsocketPort that provides a underline buffering strategy to control
