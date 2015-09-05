@@ -3,7 +3,7 @@ package relay
 import "bytes"
 
 // bufPool represents a reusable buffer pool for executing templates into.
-var bufPool *BufferPool
+var bufPool = NewBufferPool(8 * 1024)
 
 // BufferPool implements a pool of bytes.Buffers in the form of a bounded channel.
 // Pulled from the github.com/oxtoacart/bpool package (Apache licensed).
