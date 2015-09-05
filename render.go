@@ -3,6 +3,7 @@
 package relay
 
 import (
+	"errors"
 	"mime/multipart"
 	"net/url"
 	"text/template"
@@ -41,9 +42,7 @@ var SimpleEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, e
 })
 
 // BasicHTTPCodec returns a new codec based on the basic deocder and encoder
-func BasicHTTPCodec() HTTPCodec {
-	return NewHTTPCodec(SimpleEncoder, MessageDecoder)
-}
+var BasicHTTPCodec = NewHTTPCodec(SimpleEncoder, MessageDecoder)
 
 // Head provides a basic message status and head values
 type Head struct {
@@ -127,3 +126,34 @@ var XMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, erro
 
 	return 0, nil
 })
+
+// ErrInvalidByteType is returned when the interface is ot a []byte
+var ErrInvalidByteType = errors.New("interface not a []byte")
+
+//ByteSocketEncoder provides the basic websocket message encoder for encoding json messages
+var ByteSocketEncoder = NewSocketEncoder(func(w *Websocket, t int, bu interface{}) (int, error) {
+	var err error
+	var size int
+
+	bo, ok := bu.([]byte)
+
+	if !ok {
+		return 0, ErrInvalidByteType
+	}
+
+	err = w.Conn.WriteMessage(t, bo)
+
+	if err == nil {
+		size = len(bo)
+	}
+
+	return size, err
+})
+
+//ByteSocketDecoder provides the basic websocket decoder which justs returns a decoder
+var ByteSocketDecoder = NewSocketDecoder(func(t int, bu []byte) (interface{}, error) {
+	return bu, nil
+})
+
+// BasicSocketCodec returns a codec using the socket encoder and decoder
+var BasicSocketCodec = NewSocketCodec(ByteSocketEncoder, ByteSocketDecoder)

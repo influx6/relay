@@ -119,3 +119,14 @@ type SocketCodec interface {
 	SocketEncoder
 	SocketDecoder
 }
+
+// SocketCodeco represents a generic http codec
+type socketCodec struct {
+	SocketEncoder
+	SocketDecoder
+}
+
+// NewSocketCodec returns a new http codec
+func NewSocketCodec(e SocketEncoder, d SocketDecoder) SocketCodec {
+	return &socketCodec{e, d}
+}

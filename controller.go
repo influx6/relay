@@ -48,13 +48,13 @@ func NewController(name string) *Controller {
 // Websocket returns a WebsocketPort that provides a underline buffering strategy to control
 //socket requests handling throttling to a specific address
 func (c *Controller) Websocket(fx SocketHandler) *WebsocketPort {
-	return c.WebsocketAction(fx, BasicSocketCodec(), dheaders, dupgrade)
+	return c.WebsocketAction(fx, BasicSocketCodec, dheaders, dupgrade)
 }
 
 // HTTP returns a HTTPort that provides a underline buffering strategy to control
 //requests handling throttling to a specifc address
 func (c *Controller) HTTP(fx HTTPHandler) *HTTPort {
-	return c.HTTPAction(fx, BasicHTTPCodec())
+	return c.HTTPAction(fx, BasicHTTPCodec)
 }
 
 // WebsocketAction returns a WebsocketPort that provides a underline buffering strategy to control
