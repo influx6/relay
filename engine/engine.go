@@ -5,8 +5,13 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/imdario/mergo"
+	"github.com/influx6/flux"
 	"github.com/influx6/relay"
 	"gopkg.in/yaml.v2"
 )
@@ -133,4 +138,30 @@ func (a *Engine) EngineAddr() net.Addr {
 // Close closes and returns an error of the internal listener
 func (a *Engine) Close() error {
 	return a.li.Close()
+}
+
+// AppSignalInit provides a wrap function thats starts up the server and loads up,awaiting for a signal to kill
+func AppSignalInit(ms time.Duration, app *Engine, cb func(*Engine)) {
+
+	//start up the app server calling the .Serve()
+	go flux.RecoveryHandler("App.Engine.Serve", app.Serve)
+
+	//setup the signal block and listen for the interrup
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGQUIT)
+	signal.Notify(ch, os.Interrupt)
+
+	//setup a for loop and begin calling
+	for {
+		select {
+		case <-time.After(ms):
+			//TODO: make app return info,health status and
+			//useful info
+			if cb != nil {
+				cb(app)
+			}
+		case <-ch:
+			app.Close()
+		}
+	}
 }
