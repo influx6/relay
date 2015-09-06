@@ -149,10 +149,14 @@ Relay is a simple microframework with very simple designs that provide you with 
     //Strategy two:
     //for a more chat like experience use for websocket, apart
     //from rolling out your own registration and broadcast units,
-    //you can use the relay.SocketHub which takes each socket,registers
-    //and automatically receives messages and calls a supplied callback
-    //and provides a distribution function that excludes a supplied socket
-    // create a central socket hub for the message and reply process
+    //you can use the relay.SocketHub which takes each socket,registers it
+    //and automatically receives messages from it and other registed sockets
+    //and calls the supplied handler callback as below.
+    //SocketHub provides a distribute function can exclude one supplied socket
+    //from the message its sending to the others,to allow a reply approach
+
+    //Has below lets create a central socket hub for the message and reply process of
+    //the incoming sockets
     sockhub := relay.NewSocketHub(func(hub *relay.SocketHub, msg *relay.WebsocketMessage){
       //handle the message
       data,err := msg.Message()
