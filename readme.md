@@ -144,7 +144,7 @@ Relay is a simple microframework with very simple designs that provide you with 
       }
 
 
-    },nil) // => returns a http port
+    },nil) // => returns a Websocket port
 
     //Strategy two:
     //for a more chat like experience use for websocket, apart
@@ -180,7 +180,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
     home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
       hub.AddConnection(soc)
-    },nil) // => returns a http port
+    },nil) // => returns a websocket port
 
     //BindSocketFor provides more control of what headers the socket uses,
     //the upgrade settings needed apart from the usual path,
@@ -193,7 +193,7 @@ Relay is a simple microframework with very simple designs that provide you with 
     },http.Header(map[string][]string{
     	"Access-Control-Allow-Credentials": []string{"true"},
     	"Access-Control-Allow-Origin":      []string{"*"},
-    }))
+    })) //returns a websocket port
 
   	app.Serve()
   ```
