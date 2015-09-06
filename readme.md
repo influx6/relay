@@ -60,7 +60,7 @@ Relay is a simple microframework with very simple designs that provide you with 
   	app := engine.NewEngine(conf)
 
     //ServeDir serves a directory and ripps out the given path strip if supplied
-  	app.ServeDir("/assets", conf.Folders.Assets, "/assets/")
+  	app.ServeDir("/assets", app.Folders.Assets, "/assets/")
 
     //basic controller
 
