@@ -119,7 +119,9 @@ func (a *Engine) loadup() error {
 			return err
 		}
 
+		log.Printf("Setting up assets dir: %s", a.Folders.Assets)
 		a.ServeDir("/assets", a.Folders.Assets, "/assets/")
+		log.Printf("Done loading assets dir: %s", a.Folders.Assets)
 	}
 
 	return nil
