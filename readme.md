@@ -172,7 +172,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
         //use the codec encoder but with more control of the type
         //of message we send,morphed and writing by the encoder.
-        other.Write(gorilla.TextMessage,[]byte("yay! got it!"))
+        other.Write(websocket.TextMessage,[]byte("yay! got it!"))
 
       },msg.Worker)
 
@@ -187,7 +187,7 @@ Relay is a simple microframework with very simple designs that provide you with 
     //request method and handler to use
     home.BindSocketFor("get post put","/socket",func(soc *relay.SocketWorker){
       //...
-    },BasicSocketCodec,gorilla.Upgrader{
+    },BasicSocketCodec,websocket.Upgrader{
     	ReadBufferSize:  1024,
     	WriteBufferSize: 1024,
     },http.Header(map[string][]string{
