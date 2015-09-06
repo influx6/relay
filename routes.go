@@ -165,11 +165,6 @@ func (r *Routes) RouteGET(pattern string, h Routable) {
 	r.Add("get", pattern, h.Handle)
 }
 
-// RouteWithMethods sets the handler to only requests of this method
-func (r *Routes) RouteWithMethods(pattern string, methods []string, h Routable) {
-	r.WithMethods(pattern, methods, h.Handle)
-}
-
 // OPTIONS sets the handler to only requests of this method
 func (r *Routes) OPTIONS(pattern string, h RHandler) {
 	r.Add("options", pattern, h)
@@ -205,76 +200,38 @@ func (r *Routes) GET(pattern string, h RHandler) {
 	r.Add("get", pattern, h)
 }
 
-// WithMethods provides a route handler for dealing with routes that can handle more than one method
-func (r *Routes) WithMethods(pattern string, methods []string, h RHandler) {
-	r.Add("", pattern, func(res http.ResponseWriter, req *http.Request, c Collector) {
-
-		mo := strings.ToLower(req.Method)
-		var found bool
-
-		for _, amo := range methods {
-			if mo == strings.ToLower(amo) {
-				found = true
-				break
-			}
-			continue
-		}
-
-		if !found {
-			r.doFail(res, req, c)
-			return
-		}
-
-		h(res, req, c)
-	})
-}
-
 // ServeDir serves up a directory to the request
 func (r *Routes) ServeDir(pattern, dir, strip string) {
-	r.WithMethods(pattern+"/*", []string{"get", "head"}, func(res http.ResponseWriter, req *http.Request, c Collector) {
-
+	r.Add("get head", pattern+"/*", func(res http.ResponseWriter, req *http.Request, c Collector) {
 		requested := reggy.CleanPath(req.URL.Path)
 		file := strings.TrimPrefix(requested, strip)
 
 		if err := ServeFile("index.html", dir, file, res, req); err != nil {
 			r.doFail(res, req, c)
 		}
-
 	})
 }
 
 // ServeDirIndex serves up a directory to the request
 func (r *Routes) ServeDirIndex(pattern, indexFile, dir, strip string) {
-	r.WithMethods(pattern+"/*", []string{"get", "head"}, func(res http.ResponseWriter, req *http.Request, c Collector) {
-
-		// _, file := path.Split(pao)
+	r.Add("get head", pattern+"/*", func(res http.ResponseWriter, req *http.Request, c Collector) {
 		requested := reggy.CleanPath(req.URL.Path)
 		file := strings.TrimPrefix(requested, strip)
 
 		if err := ServeFile(indexFile, dir, file, res, req); err != nil {
 			r.doFail(res, req, c)
 		}
-
 	})
 }
 
 //ServeFile adds a only route for handling file requests
 func (r *Routes) ServeFile(pattern, file string) {
-	r.Add("", pattern, func(res http.ResponseWriter, req *http.Request, c Collector) {
+	r.Add("get head", pattern, func(res http.ResponseWriter, req *http.Request, c Collector) {
 
 		dir, file := path.Split(file)
-
-		mo := strings.ToLower(req.Method)
-
-		if mo != "get" && mo != "head" {
-			r.doFail(res, req, c)
-			return
-		}
-
 		if err := ServeFile("", dir, file, res, req); err != nil {
 			r.doFail(res, req, c)
 		}
-
 	})
 }
 
