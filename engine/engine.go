@@ -115,11 +115,11 @@ func (a *Engine) loadup() error {
 	//is the asset folder not empty?, if so load it up
 	if a.Folders.Assets != "" {
 
+		log.Printf("Setting up assets dir: %s", a.Folders.Assets)
 		if _, err := os.Stat(a.Folders.Assets); err != nil {
 			return err
 		}
 
-		log.Printf("Setting up assets dir: %s", a.Folders.Assets)
 		a.ServeDir("/assets", a.Folders.Assets, "/assets/")
 		log.Printf("Done loading assets dir: %s", a.Folders.Assets)
 	}
@@ -165,6 +165,7 @@ func AppSignalInit(ms time.Duration, app *Engine, cb func(*Engine)) {
 	//start up the app server calling the .Serve()
 	go flux.RecoveryHandlerCallback("App.Engine.Serve", app.Serve, func(ex interface{}) {
 		//if we are in dev mode then panic,we should know when things go wrong
+		log.Printf("Error occured: %s will panic if in dev env", ex)
 		if app.Env == "dev" {
 			panic(ex)
 		}
