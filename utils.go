@@ -26,7 +26,7 @@ func setUpHeadings(r *HTTPRequest) {
 		trident := strings.Index(ag, "Trident/")
 
 		if msie != -1 || trident != -1 {
-			r.Res.Header().Set("X-XSS-Protection", "0")
+			// r.Res.Header().Set("X-XSS-Protection", "0")
 		}
 	}
 

@@ -28,6 +28,19 @@ type netport struct {
 	port PortHandler
 }
 
+// Equal checks if the given value is equal
+func (n *netport) Equal(v interface{}) bool {
+	if nop, ok := v.(*netport); ok {
+		return nop.path == n.path
+	}
+
+	if sop, ok := v.(string); ok {
+		return n.path == sop
+	}
+
+	return false
+}
+
 // Controller provides a nice overlay on top of the behaviour of a requestlevel
 type Controller struct {
 	router *Routes
@@ -41,7 +54,7 @@ func NewController(name string) *Controller {
 	return &Controller{
 		tag:    name,
 		ports:  ds.SafeSet(),
-		router: NewRoutes(),
+		router: NewRoutes(name),
 	}
 }
 

@@ -1,7 +1,10 @@
 package relay
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"path"
 	"strings"
 	"sync"
 
@@ -43,6 +46,7 @@ type PanicHandler func(http.ResponseWriter, *http.Request, interface{})
 
 //Routes is the base struct for defining interlinking routes
 type Routes struct {
+	namespace    string
 	added        map[string]int
 	routes       []*Route
 	FailHandler  http.HandlerFunc
@@ -51,15 +55,14 @@ type Routes struct {
 }
 
 //NewRoutes returns a new Routes instance
-func NewRoutes() *Routes {
-	return BuildRoutes(func(res http.ResponseWriter, req *http.Request) {
-		http.NotFound(res, req)
-	}, nil)
+func NewRoutes(ns string) *Routes {
+	return BuildRoutes(ns, nil, nil)
 }
 
 //BuildRoutes returns a new Routes instance
-func BuildRoutes(failed http.HandlerFunc, panic PanicHandler) *Routes {
+func BuildRoutes(ns string, failed http.HandlerFunc, panic PanicHandler) *Routes {
 	rs := Routes{
+		namespace:    ns,
 		added:        make(map[string]int),
 		FailHandler:  failed,
 		PanicHandler: panic,
@@ -75,7 +78,17 @@ func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		mod := strings.ToLower(req.Method)
 		for _, no := range r.routes {
 			if no.method == "" || strings.ToLower(no.method) == mod {
-				state, params := no.Validate(req.URL.Path)
+				var ro string
+
+				// check if namespace is not empty then combine the namespace else just use url path
+				if r.namespace != "" {
+					ro = fmt.Sprintf("%s/%s", r.namespace, req.URL.Path)
+				} else {
+					ro = req.URL.Path
+				}
+
+				// state, params := no.Validate(req.URL.Path)
+				state, params := no.Validate(ro)
 				if !state {
 					continue
 				}
@@ -124,6 +137,11 @@ func (r *Routes) RouteGET(pattern string, h Routable) {
 	r.Add("get", pattern, h.Handle)
 }
 
+// RouteWithMethods sets the handler to only requests of this method
+func (r *Routes) RouteWithMethods(pattern string, methods []string, h Routable) {
+	r.WithMethods(pattern, methods, h.Handle)
+}
+
 // OPTIONS sets the handler to only requests of this method
 func (r *Routes) OPTIONS(pattern string, h RHandler) {
 	r.Add("options", pattern, h)
@@ -159,18 +177,79 @@ func (r *Routes) GET(pattern string, h RHandler) {
 	r.Add("get", pattern, h)
 }
 
+// WithMethods provides a route handler for dealing with routes that can handle more than one method
+func (r *Routes) WithMethods(pattern string, methods []string, h RHandler) {
+	r.Add("", pattern, func(res http.ResponseWriter, req *http.Request, c Collector) {
+
+		mo := strings.ToLower(req.Method)
+		var found bool
+
+		for _, amo := range methods {
+			if mo == strings.ToLower(amo) {
+				found = true
+				break
+			}
+			continue
+		}
+
+		if !found {
+			r.doFail(res, req, c)
+			return
+		}
+
+		h(res, req, c)
+	})
+}
+
+// ServeDir serves up a directory to the request
+func (r *Routes) ServeDir(pattern, dir string) {
+	r.WithMethods(pattern+"/*", []string{"get", "head"}, func(res http.ResponseWriter, req *http.Request, c Collector) {
+
+		pao := reggy.CleanPath(req.URL.Path)
+
+		_, file := path.Split(pao)
+
+		log.Printf("requesting file: %s %s", dir, file)
+
+		if err := ServeFile("", dir, file, res, req); err != nil {
+			r.doFail(res, req, c)
+		}
+
+	})
+}
+
+//ServeFile adds a only route for handling file requests
+func (r *Routes) ServeFile(pattern, file string) {
+	r.Add("", pattern, func(res http.ResponseWriter, req *http.Request, c Collector) {
+
+		dir, file := path.Split(file)
+
+		mo := strings.ToLower(req.Method)
+
+		if mo != "get" && mo != "head" {
+			r.doFail(res, req, c)
+			return
+		}
+
+		if err := ServeFile("", dir, file, res, req); err != nil {
+			r.doFail(res, req, c)
+		}
+
+	})
+}
+
 // Add adds a route into the sets of routes, method can be "" to allow all methods to be handled
 func (r *Routes) Add(mo, pattern string, h RHandler) {
 	r.ro.Lock()
 	defer r.ro.Unlock()
-	// if _, ok := r.added[pattern]; !ok {
-	// 	r.added[pattern] = len(r.routes)
-	r.routes = append(r.routes, &Route{
-		ClassicMatchMux: reggy.CreateClassic(pattern),
-		handler:         h,
-		method:          mo,
-	})
-	// }
+	if _, ok := r.added[pattern]; !ok {
+		r.added[pattern] = len(r.routes)
+		r.routes = append(r.routes, &Route{
+			ClassicMatchMux: reggy.CreateClassic(pattern),
+			handler:         h,
+			method:          mo,
+		})
+	}
 }
 
 func (r *Routes) recover(res http.ResponseWriter, req *http.Request) {
@@ -183,11 +262,12 @@ func (r *Routes) recover(res http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Routes) doFail(res http.ResponseWriter, req *http.Request, ps Collector) {
-	if r.FailHandler == nil {
-		return
-	}
 	defer r.recover(res, req)
-	r.FailHandler(res, req)
+	if r.FailHandler == nil {
+		http.NotFound(res, req)
+	} else {
+		r.FailHandler(res, req)
+	}
 }
 
 func (r *Routes) wrap(rw *Route, res http.ResponseWriter, req *http.Request, ps Collector) {

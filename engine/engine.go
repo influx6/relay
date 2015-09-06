@@ -99,7 +99,7 @@ type Engine struct {
 //NewEngine returns a new app configuration
 func NewEngine(c *Config) *Engine {
 	return &Engine{
-		Routes: relay.NewRoutes(),
+		Routes: relay.NewRoutes(""),
 		config: c,
 	}
 }

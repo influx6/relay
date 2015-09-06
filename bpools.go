@@ -11,6 +11,15 @@ type BufferPool struct {
 	c chan *bytes.Buffer
 }
 
+// type Buffer struct{
+// 	*bytes.Buffer
+// 	pool *BufferPool
+// }
+//
+//
+// func(b *Buffer) Release(){
+// }
+
 // NewBufferPool creates a new BufferPool bounded to the given size.
 func NewBufferPool(size int) (bp *BufferPool) {
 	return &BufferPool{
