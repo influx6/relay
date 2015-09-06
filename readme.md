@@ -24,6 +24,18 @@ Relay is a simple microframework with very simple designs that provide you with 
 
 #Example
 
+  ```yaml  
+    #file: app.yaml
+
+    addr: ":3000"
+
+    folders:
+      assets: ./app/assets
+      models: ./app/models
+      views: ./app/views
+
+  ```
+
   ```go
 
     package app
@@ -37,10 +49,18 @@ Relay is a simple microframework with very simple designs that provide you with 
     	"github.com/influx6/relay/engine"
     )
 
-  	app := engine.NewEngine()
+    conf := engine.NewConfig()
+
+    //can be loaded from a file
+  	if err := conf.Load("./app.yaml"); err != nil {
+  		log.Printf("Error occured loading config: %s", err.Error())
+  		return
+  	}
+
+  	app := engine.NewEngine(conf)
 
     //ServeDir serves a directory and ripps out the given path strip if supplied
-  	app.ServeDir("/assets", c.Folders.Assets, "/assets/")
+  	app.ServeDir("/assets", conf.Folders.Assets, "/assets/")
 
     //basic controller
 

@@ -29,7 +29,7 @@ type tlsconf struct {
 	Cert string `yaml:"cert"`
 }
 
-// UnmarshalYaml unmarshalls the incoming data for use
+// UnmarshalYAML unmarshalls the incoming data for use
 func (t *TLSConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	toc := tlsconf{}
 
@@ -92,15 +92,15 @@ func (c *Config) Load(file string) error {
 //Engine provides a base luncher for a service
 type Engine struct {
 	*relay.Routes
-	li     net.Listener
-	config *Config
+	*Config
+	li net.Listener
 }
 
 //NewEngine returns a new app configuration
 func NewEngine(c *Config) *Engine {
 	return &Engine{
+		Config: c,
 		Routes: relay.NewRoutes(""),
-		config: c,
 	}
 }
 
@@ -109,10 +109,10 @@ func (a *Engine) Serve() error {
 	var err error
 	var li net.Listener
 
-	if a.config.C.Certs != nil {
-		_, li, err = relay.CreateTLS(a.config.Addr, a.config.C.Certs, a)
+	if a.C.Certs != nil {
+		_, li, err = relay.CreateTLS(a.Addr, a.C.Certs, a)
 	} else {
-		_, li, err = relay.CreateHTTP(a.config.Addr, a)
+		_, li, err = relay.CreateHTTP(a.Addr, a)
 	}
 
 	if err != nil {
@@ -125,8 +125,8 @@ func (a *Engine) Serve() error {
 	return nil
 }
 
-// Addr returns the address of the app
-func (a *Engine) Addr() net.Addr {
+// EngineAddr returns the address of the app
+func (a *Engine) EngineAddr() net.Addr {
 	return a.li.Addr()
 }
 
