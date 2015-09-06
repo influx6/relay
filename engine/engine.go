@@ -188,6 +188,7 @@ func AppSignalInit(ms time.Duration, app *Engine, cb func(*Engine)) {
 			}
 		case <-ch:
 			app.Close()
+			os.Exit(0)
 		}
 	}
 }
