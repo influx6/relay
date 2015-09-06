@@ -87,7 +87,7 @@ Relay is a simple microframework with very simple designs that provide you with 
       //...handle the custom request object
       msg, err := req.Message()
       //use the msg to get Params, Body or ParseForm/Form depending
-      //content type of request
+      //on the content type of request (www-urlencode, multipart,body)
     },relay.BasicHTTPCodec) // => returns a http port
 
     //you can also use the pure go-handler approach
