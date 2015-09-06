@@ -59,10 +59,15 @@ Relay is a simple microframework with very simple designs that provide you with 
     })
 
     //the real route is /home/:id, using the internal request
-    //encapsulation in relay which wraps up the request
-    //and response and uses the codecs for writing and reading data
+    //encapsulation in relay caslled HTTPRequest, which wraps up the request
+    //and response and uses the codecs for writing and reading data and provides a
+    // .Message()(*Message,error) which parses the body or form data according to the
+    //content type
     home.BindHTTP("get post put","/:id",func(req *relay.HTTPRequest){
-      //handle the custom request object
+      //...handle the custom request object
+      msg, err := req.Message()
+      //use the msg to get Params, Body or ParseForm/Form depending
+      //content type of request
     },relay.BasicHTTPCodec) // => returns a http port
 
     //you can also use the pure go-handler approach
@@ -70,74 +75,98 @@ Relay is a simple microframework with very simple designs that provide you with 
       //handle the request and response
     })
 
-    //the codec argument can be nil which defaults to using the
+    //the codec(last argument) argument can be nil which defaults to using the
     //BasicHTTPCodec as the internal http codec
     home.BindHTTP("get post put","/:names",func(req *relay.HTTPRequest){
       //handle the custom request object
     },nil) // => returns a http port
 
-    //Binding for websocket connections each controller provides
+    //Binding for websocket connections exists and each controller provides
     //the BindSocket and BindSocketFor where each allows a more refined control on arguments.
+    //Relay provides two strategies when dealing with websocket connections:
+
+
+    //Strateg one: (handling socket messages directly)
+    //With websocket is the SocketWorker which encapsulates
+    //the gorilla.WebSocket object and create a infinite buffer
+    //where messages are received until you begin to handle them
+    //by receiving from the message channel
+    //which returns a relay.WebsocketMessage type
     home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
 
-      //Strateg one:
-      //With websocket is the SocketWorker which encapsulates
-      //the gorilla.WebSocket object and create a infinite buffer
-      //where messages are received until you being handling them
-      //by receiving from the message channel
-      //where it returns a relay.WebsocketMessage
       for data := range soc.Messages {
 
-        //do something with the data and reply, replies are given
-        //the same exact type as the message it recieved,since
+        //do something with the data and reply, since
         //relay.WebsocketMessage uses the internal or supplied codec,
-        //the data can be anything you wish,so a (interface{},error) is returned
+        //the data can be anything you wish to return from the codec,
+        //so a (interface{},error) is returned,so you can type asset
         words,err := data.Message()
 
         if err != nil {
           continue
         }
 
-        // if we use the default codec,a []byte is returned
-        //but the codec used is up to you,so this can be any thing your codec returns
+        // if we use the default codec BasicSocketCodec,
+        //then a []byte is returned but the codec used is up
+        //to you,so this can be any thing your codec returns
         bu := words.([]byte)
 
-        //do somethings with bu
-
-
+        //replies are written with the same message type
+        //as the message it received
+        //when using the 'WebsocketMessage.Write' method,
         data.Write([]byte("ok"))
+
+        //or
+
+        //using the gorilla.Conn wraped by relay.WebSocket directly
+        err := data.Socket.WriteMessage(....)
       }
 
 
     },nil) // => returns a http port
 
+    //Strategy two:
+    //for a more chat like experience use for websocket, apart
+    //from rolling out your own registration and broadcast units,
+    //you can use the relay.SocketHub which takes each socket,registers
+    //and automatically receives messages and calls a supplied callback
+    //and provides a distribution function that excludes a supplied socket
+    // create a central socket hub for the message and reply process
     sockhub := relay.NewSocketHub(func(hub *relay.SocketHub, msg *relay.WebsocketMessage){
-
       //handle the message
       data,err := msg.Message()
 
-      //distribute reply to others, but excluding the sender
+      //distribute reply to others, but excluding the sender which can be
+      //passed as the second argument
       hub.Distribute(func(other *relay.SocketWorker){
+
         //for more freedom you can write directly skipping the codec encoder
         other.Socket().WriteMessage(...)
 
-        //or use the codec decoder but with more control of the type
-        //of message we send,morphed and writing by the decoder.
-        other.Write(gorilla.TextMessage,....)
+        //or
+
+        //use the codec encoder but with more control of the type
+        //of message we send,morphed and writing by the encoder.
+        other.Write(gorilla.TextMessage,[]byte("yay! got it!"))
 
       },msg.Worker)
 
     })
 
     home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
-      //Strategy two:
-      //for a more chat like experience use for websocket, apart
-      //from rolling out your own registration and broadcast units,
-      //you can use the relay.SocketHub which takes each socket,registers
-      //and automatically receives messages and calls a supplied callback
-      //and provides a distribution function that excludes a supplied socket
       hub.AddConnection(soc)
     },nil) // => returns a http port
+
+    //BindSocketFor provides more control of what headers the socket uses, the upgrade settings needed apart from the usual path, request method and handler to use
+    home.BindSocketFor("get post put","/socket",func(soc *relay.SocketWorker){
+      //...
+    },BasicSocketCodec,gorilla.Upgrader{
+    	ReadBufferSize:  1024,
+    	WriteBufferSize: 1024,
+    },http.Header(map[string][]string{
+    	"Access-Control-Allow-Credentials": []string{"true"},
+    	"Access-Control-Allow-Origin":      []string{"*"},
+    }))
 
   	app.Serve()
   ```
