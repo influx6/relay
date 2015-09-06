@@ -91,7 +91,8 @@ Relay is a simple microframework with very simple designs that provide you with 
     //the gorilla.WebSocket object and create a infinite buffer
     //where messages are received until you begin to handle them
     //by receiving from the message channel
-    //which returns a relay.WebsocketMessage type
+    //which returns a relay.WebsocketMessage type.
+    //the handler is sent into a go-routine,so worry not of blockage ;)
     home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
 
       for data := range soc.Messages {
