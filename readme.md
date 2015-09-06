@@ -178,9 +178,12 @@ Relay is a simple microframework with very simple designs that provide you with 
 
     })
 
-    home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
-      hub.AddConnection(soc)
-    },nil) // => returns a websocket port
+    // home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
+    //   hub.AddConnection(soc)
+    // },nil) // => returns a websocket port
+    
+    home.BindSocket("get post put","/socket",hub.AddConnection,nil) // => returns a websocket port
+
 
     //BindSocketFor provides more control of what headers the socket uses,
     //the upgrade settings needed apart from the usual path,
