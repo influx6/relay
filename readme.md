@@ -47,8 +47,8 @@ Relay is a simple microframework with very simple designs that provide you with 
     home := relay.NewController("/home")
     app.Bind(home)
 
-    //the internal router allows the specification of 
-    //methods to handle as a list of space seperated values
+    //the internal router allows the specification of
+    //request methods to handle  for this route as a list of space seperated values
     app.Add("get head delete","/jails",func(res http.ResponseWriter,req *http.Request,params relay.Collector){
       //handle the request and response
     })
@@ -58,39 +58,39 @@ Relay is a simple microframework with very simple designs that provide you with 
       //handle the request and response
     })
 
-    //the real route is /home/:id, using the internal request 
-    //encapsulation in relay which wraps up the request 
+    //the real route is /home/:id, using the internal request
+    //encapsulation in relay which wraps up the request
     //and response and uses the codecs for writing and reading data
     home.BindHTTP("get post put","/:id",func(req *relay.HTTPRequest){
       //handle the custom request object
     },relay.BasicHTTPCodec) // => returns a http port
 
-    //using the pure go-handler approach either
+    //you can also use the pure go-handler approach
     home.Get("/updates",func(res http.ResponseWriter,req *http.Request,params relay.Collector){
       //handle the request and response
     })
 
-    //the codec argument can be nil which defaults to using the 
+    //the codec argument can be nil which defaults to using the
     //BasicHTTPCodec as the internal http codec
     home.BindHTTP("get post put","/:names",func(req *relay.HTTPRequest){
       //handle the custom request object
     },nil) // => returns a http port
 
-    //Binding for websocket connections each controller provides 
+    //Binding for websocket connections each controller provides
     //the BindSocket and BindSocketFor where each allows a more refined control on arguments.
     home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
 
       //Strateg one:
-      //With websocket is the SocketWorker which encapsulates 
-      //the gorilla.WebSocket object and create a infinite buffer 
-      //where messages are received until you being handling them 
-      //by receiving from the message channel 
+      //With websocket is the SocketWorker which encapsulates
+      //the gorilla.WebSocket object and create a infinite buffer
+      //where messages are received until you being handling them
+      //by receiving from the message channel
       //where it returns a relay.WebsocketMessage
       for data := range soc.Messages {
-      
-        //do something with the data and reply, replies are given 
-        //the same exact type as the message it recieved,since 
-        //relay.WebsocketMessage uses the internal or supplied codec, 
+
+        //do something with the data and reply, replies are given
+        //the same exact type as the message it recieved,since
+        //relay.WebsocketMessage uses the internal or supplied codec,
         //the data can be anything you wish,so a (interface{},error) is returned
         words,err := data.Message()
 
@@ -121,7 +121,7 @@ Relay is a simple microframework with very simple designs that provide you with 
         //for more freedom you can write directly skipping the codec encoder
         other.Socket().WriteMessage(...)
 
-        //or use the codec decoder but with more control of the type 
+        //or use the codec decoder but with more control of the type
         //of message we send,morphed and writing by the decoder.
         other.Write(gorilla.TextMessage,....)
 
@@ -131,10 +131,10 @@ Relay is a simple microframework with very simple designs that provide you with 
 
     home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
       //Strategy two:
-      //for a more chat like experience use for websocket, apart 
-      //from rolling out your own registration and broadcast units, 
-      //you can use the relay.SocketHub which takes each socket,registers 
-      //and automatically receives messages and calls a supplied callback 
+      //for a more chat like experience use for websocket, apart
+      //from rolling out your own registration and broadcast units,
+      //you can use the relay.SocketHub which takes each socket,registers
+      //and automatically receives messages and calls a supplied callback
       //and provides a distribution function that excludes a supplied socket
       hub.AddConnection(soc)
     },nil) // => returns a http port
