@@ -2,7 +2,6 @@ package relay
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"path"
 	"strings"
@@ -81,6 +80,7 @@ func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 				var ro string
 
 				// check if namespace is not empty then combine the namespace else just use url path
+
 				if r.namespace != "" {
 					ro = fmt.Sprintf("%s/%s", r.namespace, req.URL.Path)
 				} else {
@@ -202,16 +202,28 @@ func (r *Routes) WithMethods(pattern string, methods []string, h RHandler) {
 }
 
 // ServeDir serves up a directory to the request
-func (r *Routes) ServeDir(pattern, dir string) {
+func (r *Routes) ServeDir(pattern, dir, strip string) {
 	r.WithMethods(pattern+"/*", []string{"get", "head"}, func(res http.ResponseWriter, req *http.Request, c Collector) {
 
-		pao := reggy.CleanPath(req.URL.Path)
+		requested := reggy.CleanPath(req.URL.Path)
+		file := strings.TrimPrefix(requested, strip)
 
-		_, file := path.Split(pao)
+		if err := ServeFile("index.html", dir, file, res, req); err != nil {
+			r.doFail(res, req, c)
+		}
 
-		log.Printf("requesting file: %s %s", dir, file)
+	})
+}
 
-		if err := ServeFile("", dir, file, res, req); err != nil {
+// ServeDirIndex serves up a directory to the request
+func (r *Routes) ServeDirIndex(pattern, indexFile, dir, strip string) {
+	r.WithMethods(pattern+"/*", []string{"get", "head"}, func(res http.ResponseWriter, req *http.Request, c Collector) {
+
+		// _, file := path.Split(pao)
+		requested := reggy.CleanPath(req.URL.Path)
+		file := strings.TrimPrefix(requested, strip)
+
+		if err := ServeFile(indexFile, dir, file, res, req); err != nil {
 			r.doFail(res, req, c)
 		}
 

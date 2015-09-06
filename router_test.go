@@ -4,12 +4,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/influx6/flux"
 )
 
 func TestRouter(t *testing.T) {
-	router := NewRoutes()
+	router := NewRoutes("")
 
 	req, _ := http.NewRequest("GET", "http://localhost:3000/boo/bat", nil)
 
@@ -25,31 +23,31 @@ func TestRouter(t *testing.T) {
 
 	req7, _ := http.NewRequest("HEAD", "http://localhost:3000/boo/4", nil)
 
-	router.GET("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps flux.Collector) {
+	router.GET("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
 		expect(t, ps.Get("id"), "bat")
 	})
 
-	router.POST("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps flux.Collector) {
+	router.POST("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
 		expect(t, ps.Get("id"), "post")
 	})
 
-	router.PUT("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps flux.Collector) {
+	router.PUT("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
 		expect(t, ps.Get("id"), "put")
 	})
 
-	router.PATCH("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps flux.Collector) {
+	router.PATCH("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
 		expect(t, ps.Get("id"), "patch")
 	})
 
-	router.DELETE("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps flux.Collector) {
+	router.DELETE("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
 		expect(t, ps.Get("id"), "delete")
 	})
 
-	router.OPTIONS("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps flux.Collector) {
+	router.OPTIONS("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
 		expect(t, ps.Get("id"), "options")
 	})
 
-	router.HEAD(`/header/{id:[\d+]}`, func(res http.ResponseWriter, req *http.Request, ps flux.Collector) {
+	router.HEAD(`/header/{id:[\d+]}`, func(res http.ResponseWriter, req *http.Request, ps Collector) {
 		expect(t, ps.Get("id"), 4)
 	})
 

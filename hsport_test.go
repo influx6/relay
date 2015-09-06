@@ -18,7 +18,7 @@ func expect(t *testing.T, v, m interface{}) {
 }
 
 func TestHTTPEncoder(t *testing.T) {
-	enc := BasicHTTPCodec()
+	enc := BasicHTTPCodec
 
 	res := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "http://localhost:300/foo", nil)
@@ -33,7 +33,7 @@ func TestHTTPEncoder(t *testing.T) {
 }
 
 func TestHTTPDecoder(t *testing.T) {
-	enc := BasicHTTPCodec()
+	enc := BasicHTTPCodec
 
 	ho := []byte("dead!")
 
@@ -56,7 +56,7 @@ func TestHTTPDecoder(t *testing.T) {
 }
 
 func TestHTTPPort(t *testing.T) {
-	enc := BasicHTTPCodec()
+	enc := BasicHTTPCodec
 
 	ho := []byte("dead!")
 
