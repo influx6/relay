@@ -17,7 +17,7 @@ var ErrInvalidType = errors.New("Unsupported Type")
 
 // Websocket provides a cover for websocket connection
 type Websocket struct {
-	Conn   *websocket.Conn
+	*websocket.Conn
 	Req    *http.Request
 	Res    http.ResponseWriter
 	Params Collector
@@ -49,13 +49,15 @@ func (m *WebsocketMessage) Write(bw []byte) (int, error) {
 
 // SocketWorker provides a workpool for socket connections
 type SocketWorker struct {
-	codec  SocketCodec
-	data   chan interface{}
-	closer chan bool
-	queue  *flux.Queue
-	wo     *Websocket
-	ro, rd sync.Mutex
-	closed bool
+	codec   SocketCodec
+	data    chan interface{}
+	mesgs   chan *WebsocketMessage
+	closer  chan bool
+	queue   *flux.Queue
+	wo      *Websocket
+	ro, rd  sync.Mutex
+	closed  bool
+	writing bool
 }
 
 // NewSocketWorker returns a new socketworker instance
@@ -75,8 +77,30 @@ func NewSocketWorker(wo *Websocket, codec SocketCodec) *SocketWorker {
 }
 
 // Messages returns a receive only channel for socket messages
-func (s *SocketWorker) Messages() <-chan interface{} {
-	return s.data
+func (s *SocketWorker) Messages() <-chan *WebsocketMessage {
+	if s.writing {
+		return s.mesgs
+	}
+
+	flux.GoDefer("Socket:Message:Receiver", func() {
+		for dag := range s.data {
+			if mg, ok := dag.(*WebsocketMessage); ok {
+				s.mesgs <- mg
+			}
+		}
+	})
+
+	return s.mesgs
+}
+
+// Write returns the internal socket for the worker
+func (s *SocketWorker) Write(t int, data []byte) (int, error) {
+	return s.codec.Encode(s.wo, t, data)
+}
+
+// Socket returns the internal socket for the worker
+func (s *SocketWorker) Socket() *Websocket {
+	return s.wo
 }
 
 // Equals returns true/false if interface matches
@@ -225,7 +249,7 @@ func (s *SocketHub) manageSocket(ws *SocketWorker) {
 			if !ok {
 				return
 			}
-			go s.handler(s, data.(*WebsocketMessage))
+			go s.handler(s, data)
 		}
 	}
 }
