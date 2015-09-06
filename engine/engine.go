@@ -174,6 +174,7 @@ func AppSignalInit(ms time.Duration, app *Engine, cb func(*Engine)) {
 	//setup the signal block and listen for the interrup
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGQUIT)
+	signal.Notify(ch, syscall.SIGTERM)
 	signal.Notify(ch, os.Interrupt)
 
 	//setup a for loop and begin calling
