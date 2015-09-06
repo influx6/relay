@@ -157,7 +157,9 @@ Relay is a simple microframework with very simple designs that provide you with 
       hub.AddConnection(soc)
     },nil) // => returns a http port
 
-    //BindSocketFor provides more control of what headers the socket uses, the upgrade settings needed apart from the usual path, request method and handler to use
+    //BindSocketFor provides more control of what headers the socket uses,
+    //the upgrade settings needed apart from the usual path,
+    //request method and handler to use
     home.BindSocketFor("get post put","/socket",func(soc *relay.SocketWorker){
       //...
     },BasicSocketCodec,gorilla.Upgrader{
