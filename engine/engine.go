@@ -19,6 +19,7 @@ import (
 // DefaultConfig provides a default configuration for the app
 var DefaultConfig = Config{
 	Addr:    ":8080",
+	Env:     "dev",
 	Folders: Folders{},
 }
 
@@ -66,6 +67,7 @@ type Folders struct {
 // Config provides configuration for Afro
 type Config struct {
 	Addr    string    `yaml:"addr"`
+	Env     string    `yaml:"env"`
 	C       TLSConfig `yaml:"tls"`
 	Folders Folders   `yaml:"folders"`
 }
@@ -109,6 +111,20 @@ func NewEngine(c *Config) *Engine {
 	}
 }
 
+func (a *Engine) loadup() error {
+	//is the asset folder not empty?, if so load it up
+	if a.Folders.Assets != "" {
+
+		if _, err := os.Stat(a.Folders.Assets); err != nil {
+			return err
+		}
+
+		a.ServeDir("/assets", a.Folders.Assets, "/assets/")
+	}
+
+	return nil
+}
+
 // Serve serves the app and configuration and loads the routes and serivices settings
 func (a *Engine) Serve() error {
 	var err error
@@ -127,7 +143,8 @@ func (a *Engine) Serve() error {
 
 	a.li = li
 
-	return nil
+	//load up configurations
+	return a.loadup()
 }
 
 // EngineAddr returns the address of the app
@@ -144,7 +161,12 @@ func (a *Engine) Close() error {
 func AppSignalInit(ms time.Duration, app *Engine, cb func(*Engine)) {
 
 	//start up the app server calling the .Serve()
-	go flux.RecoveryHandler("App.Engine.Serve", app.Serve)
+	go flux.RecoveryHandlerCallback("App.Engine.Serve", app.Serve, func(ex interface{}) {
+		//if we are in dev mode then panic,we should know when things go wrong
+		if app.Env == "dev" {
+			panic(ex)
+		}
+	})
 
 	//setup the signal block and listen for the interrup
 	ch := make(chan os.Signal, 1)
