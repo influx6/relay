@@ -39,6 +39,7 @@ func setUpHeadings(r *HTTPRequest) {
 		r.Res.Header().Set("Access-Control-Allow-Origin", "*")
 	}
 }
+
 func loadData(r *HTTPRequest) (*Message, error) {
 	msg := Message{}
 	msg.Method = r.Req.Method
