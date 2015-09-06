@@ -2,6 +2,7 @@ package relay
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -272,12 +273,14 @@ func (ws *WebsocketPort) Handle(res http.ResponseWriter, req *http.Request, para
 		return
 	}
 
-	ws.handle(NewSocketWorker(&Websocket{
-		Conn:   conn,
-		Req:    req,
-		Res:    res,
-		Params: params,
-	}, ws.codec))
+	flux.GoDefer(fmt.Sprintf("WebSocketPort.Handler"), func() {
+		ws.handle(NewSocketWorker(&Websocket{
+			Conn:   conn,
+			Req:    req,
+			Res:    res,
+			Params: params,
+		}, ws.codec))
+	})
 }
 
 //SocketHandler provides an handler type without the port option
