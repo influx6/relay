@@ -1,11 +1,11 @@
 package relay
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gorilla/websocket"
 	"github.com/influx6/ds"
-	"github.com/influx6/reggy"
 )
 
 var dheaders = http.Header(map[string][]string{
@@ -14,8 +14,8 @@ var dheaders = http.Header(map[string][]string{
 })
 
 var dupgrade = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
+	ReadBufferSize:  1024 * 1024,
+	WriteBufferSize: 1024 * 1024,
 }
 
 type portnet struct {
@@ -25,11 +25,11 @@ type portnet struct {
 
 type netport struct {
 	path string
-	port PortHandler
+	port interface{}
 }
 
-// Equal checks if the given value is equal
-func (n *netport) Equal(v interface{}) bool {
+// Equals checks if the given value is equal
+func (n *netport) Equals(v interface{}) bool {
 	if nop, ok := v.(*netport); ok {
 		return nop.path == n.path
 	}
@@ -43,41 +43,77 @@ func (n *netport) Equal(v interface{}) bool {
 
 // Controller provides a nice overlay on top of the behaviour of a requestlevel
 type Controller struct {
-	router *Routes
-	ports  ds.Sets
-	tag    string
+	*Routes
+	sockets, https ds.Sets
+	tag            string
 }
 
 // NewController returns a controller with the default config settings
 func NewController(name string) *Controller {
-	name = reggy.TrimSlashes(name)
 	return &Controller{
-		tag:    name,
-		ports:  ds.SafeSet(),
-		router: NewRoutes(name),
+		Routes:  NewRoutes(name),
+		tag:     name,
+		sockets: ds.SafeSet(),
+		https:   ds.SafeSet(),
 	}
 }
 
-// Websocket returns a WebsocketPort that provides a underline buffering strategy to control
-//socket requests handling throttling to a specific address
-func (c *Controller) Websocket(fx SocketHandler) *WebsocketPort {
-	return c.WebsocketAction(fx, BasicSocketCodec, dheaders, dupgrade)
+// GetSocket gets the websocket port for the specific pattern
+func (c *Controller) GetSocket(pattern string) (*WebsocketPort, error) {
+	ind, ok := c.sockets.Find(pattern)
+	if !ok {
+		return nil, ErrorNotFind
+	}
+	port := c.sockets.Get(ind).(*netport).port
+	return port.(*WebsocketPort), nil
 }
 
-// HTTP returns a HTTPort that provides a underline buffering strategy to control
-//requests handling throttling to a specifc address
-func (c *Controller) HTTP(fx HTTPHandler) *HTTPort {
-	return c.HTTPAction(fx, BasicHTTPCodec)
+// GetHTTP gets the http port for the specific pattern
+func (c *Controller) GetHTTP(pattern string) (*HTTPort, error) {
+	ind, ok := c.https.Find(pattern)
+	if !ok {
+		return nil, ErrorNotFind
+	}
+	port := c.https.Get(ind).(*netport).port
+	return port.(*HTTPort), nil
 }
 
-// WebsocketAction returns a WebsocketPort that provides a underline buffering strategy to control
-//socket requests handling throttling to a specific address
-func (c *Controller) WebsocketAction(fx SocketHandler, codec SocketCodec, headers http.Header, up websocket.Upgrader) *WebsocketPort {
-	return NewWebsocketPort(codec, &up, headers, fx)
+// BindSocket returns a WebsocketPort that provides a underline buffering strategy to control socket requests handling throttling to a specific address. It requries the supply of a codec but if not supplied uses a default socket codec
+func (c *Controller) BindSocket(mo, pattern string, fx SocketHandler, codec SocketCodec) (*WebsocketPort, error) {
+	if codec == nil {
+		codec = BasicSocketCodec
+	}
+	return c.BindSocketFor(mo, pattern, fx, codec, dupgrade, dheaders)
 }
 
-// HTTPAction returns a HTTPort that provides a underline buffering strategy to control
-//requests handling throttling to a specifc address
-func (c *Controller) HTTPAction(fx HTTPHandler, codec HTTPCodec) *HTTPort {
-	return NewHTTPort(codec, fx)
+// ErrPatternBound is returned when the pattern is bound
+var ErrPatternBound = errors.New("Pattern is already bound")
+
+// BindHTTP binds a pattern/route to a websocket port and registers that into the controllers router, requiring the supply of a codec for handling encoding/decoding process but if not supplied uses a default http codec
+func (c *Controller) BindHTTP(mo, pattern string, fx HTTPHandler, codec HTTPCodec) (*HTTPort, error) {
+	if c.HasRoute(pattern) {
+		return nil, ErrPatternBound
+	}
+
+	if codec == nil {
+		codec = BasicHTTPCodec
+	}
+
+	hs := NewHTTPort(codec, fx)
+	c.sockets.Add(&netport{pattern, hs}, -1)
+
+	c.Add(mo, pattern, hs.Handle)
+	return hs, nil
+}
+
+// BindSocketFor binds a pattern/route to a websocket port and registers that into the controllers router and allows a more refined and control configuration for the socket connection
+func (c *Controller) BindSocketFor(mo, pattern string, fx SocketHandler, codec SocketCodec, up websocket.Upgrader, headers http.Header) (*WebsocketPort, error) {
+	if c.HasRoute(pattern) {
+		return nil, ErrPatternBound
+	}
+
+	ws := NewWebsocketPort(codec, &up, headers, fx)
+	c.sockets.Add(&netport{pattern, ws}, -1)
+	c.Add(mo, pattern, ws.Handle)
+	return ws, nil
 }

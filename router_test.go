@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/influx6/flux"
 )
 
 func TestRouter(t *testing.T) {
@@ -51,6 +53,10 @@ func TestRouter(t *testing.T) {
 		expect(t, ps.Get("id"), 4)
 	})
 
+	router.Add("get head  connect", "/goo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		// expect(t, ps.Get("id"), "options")
+	})
+
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	router.ServeHTTP(rec, req2)
@@ -59,5 +65,29 @@ func TestRouter(t *testing.T) {
 	router.ServeHTTP(rec, req5)
 	router.ServeHTTP(rec, req6)
 	router.ServeHTTP(rec, req7)
+}
 
+func TestBindRouter(t *testing.T) {
+	router := NewRoutes("")
+
+	rs := NewRoutes("/boo")
+
+	if rs.Namespace() != "/boo/*" {
+		flux.FatalFailed(t, "expected router namespace to end with '/*'", rs.Namespace())
+	}
+
+	err := router.Bind(rs)
+
+	if err != nil {
+		flux.FatalFailed(t, "Unable to bind routers: %s", err.Error())
+	}
+
+	rs.GET("/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		expect(t, ps.Get("id"), "bat")
+	})
+
+	req, _ := http.NewRequest("GET", "http://localhost:3000/boo/bat", nil)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
 }

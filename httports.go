@@ -34,9 +34,15 @@ func (m *HTTPRequest) Write(bw []byte) (int, error) {
 // Message returns the data of the socket
 func (m *HTTPRequest) Message() (*Message, error) {
 	msg, err := m.codec.Decode(m)
+
+	if err != nil {
+		return nil, err
+	}
+
 	if msg.Params == nil {
 		msg.Params = m.Params
 	}
+
 	return msg, err
 }
 

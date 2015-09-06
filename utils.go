@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -40,6 +41,9 @@ func setUpHeadings(r *HTTPRequest) {
 	}
 }
 
+// ErrNoBody is returned when the request has no body
+var ErrNoBody = errors.New("Http Request Has no body")
+
 func loadData(r *HTTPRequest) (*Message, error) {
 	msg := Message{}
 	msg.Method = r.Req.Method
@@ -74,7 +78,12 @@ func loadData(r *HTTPRequest) (*Message, error) {
 	}
 
 	if r.Req.Body == nil {
-		return nil, nil
+		if err := r.Req.ParseForm(); err != nil {
+			return nil, err
+		}
+		msg.Form = r.Req.Form
+		msg.PostForm = r.Req.PostForm
+		return &msg, nil
 	}
 
 	data := make([]byte, r.Req.ContentLength)

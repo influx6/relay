@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -36,8 +37,9 @@ type Routable interface {
 //Route define a specific route with its handler
 type Route struct {
 	*reggy.ClassicMatchMux
-	handler RHandler
-	method  string
+	handler  RHandler
+	method   map[string]bool
+	nomethod bool
 }
 
 // PanicHandler provides a panic function type for requests
@@ -60,6 +62,7 @@ func NewRoutes(ns string) *Routes {
 
 //BuildRoutes returns a new Routes instance
 func BuildRoutes(ns string, failed http.HandlerFunc, panic PanicHandler) *Routes {
+	ns = reggy.TrimSlashes(ns)
 	rs := Routes{
 		namespace:    ns,
 		added:        make(map[string]int),
@@ -69,6 +72,29 @@ func BuildRoutes(ns string, failed http.HandlerFunc, panic PanicHandler) *Routes
 	return &rs
 }
 
+// Namespace returns the path of the route with a added '/*' to endicate allowance of all paths,this is used by other routes to bind to a parent router
+func (r *Routes) Namespace() string {
+	if r.namespace == "" {
+		return r.namespace
+	}
+	return reggy.CleanPath(fmt.Sprintf("/%s/*", r.namespace))
+}
+
+// Bind routes bind a router using the router namespace,except if the router namespace is an empty string
+func (r *Routes) Bind(rx *Routes) error {
+	if rx.Namespace() == "" {
+		return NewCustomError("Router:Namespace.Error", "namespace is aqn empty string and not allowed")
+	}
+
+	r.Add("", rx.Namespace(), rx.Handle)
+	return nil
+}
+
+//Handle provides a router handler for handling routes incoming from other routers
+func (r *Routes) Handle(res http.ResponseWriter, req *http.Request, _ Collector) {
+	r.ServeHTTP(res, req)
+}
+
 //ServeHTTP handles the a request cycle
 func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	flux.RecoveryHandler("Route:ServeHTTP", func() error {
@@ -76,16 +102,17 @@ func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		defer r.ro.RUnlock()
 		mod := strings.ToLower(req.Method)
 		for _, no := range r.routes {
-			if no.method == "" || strings.ToLower(no.method) == mod {
+
+			if no.method[mod] || no.nomethod {
 				var ro string
 
 				// check if namespace is not empty then combine the namespace else just use url path
 
-				if r.namespace != "" {
-					ro = fmt.Sprintf("%s/%s", r.namespace, req.URL.Path)
-				} else {
-					ro = req.URL.Path
-				}
+				// if r.namespace != "" {
+				// 	ro = fmt.Sprintf("%s/%s", r.namespace, req.URL.Path)
+				// } else {
+				ro = req.URL.Path
+				// }
 
 				// state, params := no.Validate(req.URL.Path)
 				state, params := no.Validate(ro)
@@ -95,6 +122,7 @@ func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 				r.wrap(no, res, req, Collector(params))
 				// break
 				return nil
+
 			}
 		}
 		r.doFail(res, req, nil)
@@ -250,18 +278,56 @@ func (r *Routes) ServeFile(pattern, file string) {
 	})
 }
 
-// Add adds a route into the sets of routes, method can be "" to allow all methods to be handled
+var multispaces = regexp.MustCompile(`\s+`)
+
+// Add adds a route into the sets of routes, method can be "" to allow all methods to be handled or a stringed range eg "get head put" to allow this range of methods(get,head,put) only for the handler
 func (r *Routes) Add(mo, pattern string, h RHandler) {
 	r.ro.Lock()
 	defer r.ro.Unlock()
+
+	var fatt string
+
+	if r.namespace != "" {
+		fatt = reggy.CleanPath(fmt.Sprintf("/%s/%s", r.namespace, pattern))
+	} else {
+		fatt = pattern
+	}
+
+	var mod = make(map[string]bool)
+
+	if mo != "" {
+		cln := multispaces.ReplaceAllString(mo, " ")
+
+		amod := multispaces.Split(cln, -1)
+
+		for _, ro := range amod {
+			mod[ro] = true
+		}
+	}
+
 	if _, ok := r.added[pattern]; !ok {
 		r.added[pattern] = len(r.routes)
 		r.routes = append(r.routes, &Route{
-			ClassicMatchMux: reggy.CreateClassic(pattern),
+			ClassicMatchMux: reggy.CreateClassic(fatt),
 			handler:         h,
-			method:          mo,
+			method:          mod,
+			nomethod:        len(mod) == 0,
 		})
 	}
+}
+
+// HasRoute returns true/false if the pattern exists
+func (r *Routes) HasRoute(pattern string) bool {
+	_, ok := r.added[pattern]
+	return ok
+}
+
+// FindRoute returns the route that matches the pattern
+func (r *Routes) FindRoute(pattern string) (*Route, error) {
+	if !r.HasRoute(pattern) {
+		return nil, ErrorNotFind
+	}
+	return r.routes[r.added[pattern]], nil
 }
 
 func (r *Routes) recover(res http.ResponseWriter, req *http.Request) {

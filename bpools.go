@@ -3,18 +3,20 @@ package relay
 import "bytes"
 
 // bufPool represents a reusable buffer pool for executing templates into.
-var bufPool = NewBufferPool(1024)
+var bufPool = NewBufferPool(1000, 1024)
 
 // BufferPool implements a pool of bytes.Buffers in the form of a bounded channel.
 // Pulled from the github.com/oxtoacart/bpool package (Apache licensed).
 type BufferPool struct {
-	c chan *bytes.Buffer
+	c     chan *bytes.Buffer
+	alloc int
 }
 
 // NewBufferPool creates a new BufferPool bounded to the given size.
-func NewBufferPool(size int) (bp *BufferPool) {
+func NewBufferPool(size int, mem int) (bp *BufferPool) {
 	return &BufferPool{
-		c: make(chan *bytes.Buffer, size),
+		c:     make(chan *bytes.Buffer, size),
+		alloc: mem,
 	}
 }
 
@@ -26,7 +28,7 @@ func (bp *BufferPool) Get() (b *bytes.Buffer) {
 	// reuse existing buffer
 	default:
 		// create new buffer
-		b = bytes.NewBuffer([]byte{})
+		b = bytes.NewBuffer(make([]byte, 0, bp.alloc))
 	}
 	return
 }
@@ -34,6 +36,11 @@ func (bp *BufferPool) Get() (b *bytes.Buffer) {
 // Put returns the given Buffer to the BufferPool.
 func (bp *BufferPool) Put(b *bytes.Buffer) {
 	b.Reset()
+
+	if cap(b.Bytes()) > bp.alloc {
+		b = bytes.NewBuffer(make([]byte, 0, bp.alloc))
+	}
+
 	select {
 	case bp.c <- b:
 	default: // Discard the buffer if the pool is full.

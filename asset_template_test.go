@@ -25,8 +25,8 @@ type dataPack struct {
 	Title string
 }
 
-func TestTemplateAssets(t *testing.T) {
-	tmpl, err := LoadTemplates("./fixtures", ".tmpl", nil, nil)
+func TestBasicAssets(t *testing.T) {
+	tmpl, err := LoadTemplates("./fixtures/base", ".tmpl", nil, nil)
 
 	if err != nil {
 		flux.FatalFailed(t, "Unable to load templates: %+s", err)
@@ -41,6 +41,31 @@ func TestTemplateAssets(t *testing.T) {
 	}
 
 	err = tmpl.ExecuteTemplate(buf, "base", do)
+
+	if err != nil {
+		flux.FatalFailed(t, "Unable to exec templates: %+s", err)
+	}
+
+	flux.LogPassed(t, "Loaded Template succesfully: %s", string(buf.Bytes()))
+}
+
+func TestTemplateAssets(t *testing.T) {
+	dirs := []string{"./fixtures/includes", "./fixtures/layouts"}
+	asst, err := NewAssetTemplate("home.html", ".tmpl", dirs)
+
+	if err != nil {
+		flux.FatalFailed(t, "Failed to load: %s", err.Error())
+	}
+
+	buf := bufPool.Get()
+	defer bufPool.Put(buf)
+
+	do := &dataPack{
+		Name:  "alex",
+		Title: "flabber",
+	}
+
+	err = asst.Tmpl.ExecuteTemplate(buf, "base", do)
 
 	if err != nil {
 		flux.FatalFailed(t, "Unable to exec templates: %+s", err)
