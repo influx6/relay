@@ -18,9 +18,11 @@ import (
 
 // DefaultConfig provides a default configuration for the app
 var DefaultConfig = Config{
-	Addr:    ":8080",
-	Env:     "dev",
-	Folders: Folders{},
+	Addr:      ":8080",
+	Env:       "dev",
+	Folders:   Folders{},
+	Templates: relay.TemplateConfig{"./templates", nil, ".tmpl"},
+	Heartbeat: "5m",
 }
 
 //TLSConfig provides a base config for tls configuration
@@ -66,10 +68,12 @@ type Folders struct {
 
 // Config provides configuration for Afro
 type Config struct {
-	Addr    string    `yaml:"addr"`
-	Env     string    `yaml:"env"`
-	C       TLSConfig `yaml:"tls"`
-	Folders Folders   `yaml:"folders"`
+	Addr      string               `yaml:"addr"`
+	Env       string               `yaml:"env"`
+	Heartbeat string               `yaml:heartbeat`
+	C         TLSConfig            `yaml:"tls"`
+	Folders   Folders              `yaml:"folders"`
+	Templates relay.TemplateConfig `yaml:"templates"`
 }
 
 // NewConfig returns a new configuration file
@@ -83,6 +87,7 @@ func (c *Config) Load(file string) error {
 	data, err := ioutil.ReadFile(file)
 
 	if err != nil {
+		log.Printf("Unable to ReadConfig File: %s -> %s", file, err.Error())
 		return err
 	}
 
@@ -90,6 +95,7 @@ func (c *Config) Load(file string) error {
 	err = yaml.Unmarshal(data, &conf)
 
 	if err != nil {
+		log.Printf("Unable to load Config File: %s -> %s", file, err.Error())
 		return err
 	}
 
@@ -100,15 +106,30 @@ func (c *Config) Load(file string) error {
 type Engine struct {
 	*relay.Routes
 	*Config
-	li net.Listener
+	li       net.Listener
+	Template *relay.TemplateDir
+	//BeforeInit is run right before the server is started
+	BeforeInit func(*Engine)
+	//AfterInit is run right after the server is started
+	AfterInit func(*Engine)
+	//OnInit is runned immediate the server gets started
+	OnInit func(*Engine)
+	//HeartBeats is run a constant rate every ms provided
+	HeartBeats func(*Engine)
 }
 
 //NewEngine returns a new app configuration
-func NewEngine(c *Config) *Engine {
-	return &Engine{
-		Config: c,
-		Routes: relay.NewRoutes(""),
+func NewEngine(c *Config, init func(*Engine)) *Engine {
+	eo := &Engine{
+		Config:   c,
+		Routes:   relay.NewRoutes(""),
+		Template: relay.NewTemplateDir(&c.Templates),
 	}
+
+	if init != nil {
+		init(eo)
+	}
+	return eo
 }
 
 func (a *Engine) loadup() error {
@@ -124,6 +145,10 @@ func (a *Engine) loadup() error {
 		log.Printf("Done loading assets dir: %s", a.Folders.Assets)
 	}
 
+	if a.OnInit != nil {
+		a.OnInit(a)
+	}
+
 	return nil
 }
 
@@ -131,6 +156,11 @@ func (a *Engine) loadup() error {
 func (a *Engine) Serve() error {
 	var err error
 	var li net.Listener
+
+	//run the before init function
+	if a.BeforeInit != nil {
+		a.BeforeInit(a)
+	}
 
 	if a.C.Certs != nil {
 		_, li, err = relay.CreateTLS(a.Addr, a.C.Certs, a)
@@ -146,7 +176,15 @@ func (a *Engine) Serve() error {
 	a.li = li
 
 	//load up configurations
-	return a.loadup()
+	if err := a.loadup(); err != nil {
+		return err
+	}
+
+	if a.AfterInit != nil {
+		a.AfterInit(a)
+	}
+
+	return nil
 }
 
 // EngineAddr returns the address of the app
@@ -160,7 +198,7 @@ func (a *Engine) Close() error {
 }
 
 // AppSignalInit provides a wrap function thats starts up the server and loads up,awaiting for a signal to kill
-func AppSignalInit(ms time.Duration, app *Engine, cb func(*Engine)) {
+func AppSignalInit(app *Engine) {
 
 	//start up the app server calling the .Serve()
 	go flux.RecoveryHandlerCallback("App.Engine.Serve", app.Serve, func(ex interface{}) {
@@ -177,14 +215,15 @@ func AppSignalInit(ms time.Duration, app *Engine, cb func(*Engine)) {
 	signal.Notify(ch, syscall.SIGTERM)
 	signal.Notify(ch, os.Interrupt)
 
+	hearbeat := makeDuration(app.Heartbeat, (10 * 60))
 	//setup a for loop and begin calling
 	for {
 		select {
-		case <-time.After(ms):
+		case <-time.After(hearbeat):
 			//TODO: make app return info,health status and
 			//useful info
-			if cb != nil {
-				cb(app)
+			if app.HeartBeats != nil {
+				app.HeartBeats(app)
 			}
 		case <-ch:
 			app.Close()

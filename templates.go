@@ -3,7 +3,52 @@ package relay
 import (
 	"fmt"
 	"html/template"
+	"path/filepath"
 )
+
+// TemplateConfig provides a nice configuration for TemplateDir
+type TemplateConfig struct {
+	Dir        string
+	Delimeters []string
+	Extension  string
+}
+
+// TemplateDir provides a struct for managing template initialization per directory.
+//it allows you to set a root directory to initialize templates from
+type TemplateDir struct {
+	dir    string
+	config *TemplateConfig
+}
+
+// NewTemplateDir returns a new TemplateDir instance
+func NewTemplateDir(c *TemplateConfig) *TemplateDir {
+	return &TemplateDir{filepath.Clean(c.Dir), c}
+}
+
+// Create returns a new AssetTemplate with the name and path set
+func (t *TemplateDir) Create(name string, paths []string, fo []template.FuncMap) (*AssetTemplate, error) {
+	var dirs []string
+
+	for _, ps := range paths {
+		dirs = append(dirs, filepath.Join(t.dir, ps))
+	}
+
+	bo := BuildAssetTemplate(name, t.config.Extension, dirs, fo, t.config.Delimeters)
+	return bo, bo.Build()
+}
+
+// CreateExt returns a new AssetTemplate with the name and path set but allowing setting the custom extension
+func (t *TemplateDir) CreateExt(name, ext string, paths []string, fo []template.FuncMap) (*AssetTemplate, error) {
+	var dirs []string
+
+	for _, ps := range paths {
+		dirs = append(dirs, filepath.Join(t.dir, ps))
+	}
+
+	bo := BuildAssetTemplate(name, ext, dirs, fo, t.config.Delimeters)
+
+	return bo, bo.Build()
+}
 
 // AssetTemplate provides a simple means of loading template assets and providing reloading systems which simplifies the use
 type AssetTemplate struct {
