@@ -14,9 +14,9 @@ import (
 
 // TemplateConfig provides a nice configuration for TemplateDir
 type TemplateConfig struct {
-	Dir        string
-	Delimeters []string
-	Extension  string
+	Dir        string   `yaml:"dir" json:"dir"`
+	Delimiters []string `yaml:"delimiters" json:"delimiters"`
+	Extension  string   `yaml:"ext" json:"ext"`
 }
 
 // DefaultTemplateConfig provides a default TemplateConfig
@@ -91,7 +91,7 @@ func (t *TemplateDir) Create(name string, paths []string, fo []template.FuncMap)
 		dirs = append(dirs, filepath.Join(t.dir, ps))
 	}
 
-	bo := BuildAssetTemplate(name, t.config.Extension, dirs, fo, t.config.Delimeters)
+	bo := BuildAssetTemplate(name, t.config.Extension, dirs, fo, t.config.Delimiters)
 	return bo, bo.Build()
 }
 
@@ -103,7 +103,7 @@ func (t *TemplateDir) CreateExt(name, ext string, paths []string, fo []template.
 		dirs = append(dirs, filepath.Join(t.dir, ps))
 	}
 
-	bo := BuildAssetTemplate(name, ext, dirs, fo, t.config.Delimeters)
+	bo := BuildAssetTemplate(name, ext, dirs, fo, t.config.Delimiters)
 
 	return bo, bo.Build()
 }
