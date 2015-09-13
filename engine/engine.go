@@ -68,6 +68,8 @@ type Folders struct {
 
 // Config provides configuration for Afro
 type Config struct {
+	Name      string               `yaml:"name"`
+	APIToken  string               `yaml:"api_token"`
 	Addr      string               `yaml:"addr"`
 	Env       string               `yaml:"env"`
 	Heartbeat string               `yaml:heartbeat`

@@ -1,9 +1,15 @@
 package relay
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/ioutil"
+	"log"
 	"path/filepath"
+
+	"github.com/imdario/mergo"
+	"gopkg.in/yaml.v2"
 )
 
 // TemplateConfig provides a nice configuration for TemplateDir
@@ -11,6 +17,58 @@ type TemplateConfig struct {
 	Dir        string
 	Delimeters []string
 	Extension  string
+}
+
+// DefaultTemplateConfig provides a default TemplateConfig
+var DefaultTemplateConfig = TemplateConfig{
+	Dir:       "./templates",
+	Extension: ".tml",
+}
+
+// NewTemplateConfig returns a new TemplateConfig instance
+func NewTemplateConfig() *TemplateConfig {
+	t := DefaultTemplateConfig
+	return &t
+}
+
+// LoadJSON loads the configuration from a yaml file
+func (t *TemplateConfig) LoadJSON(file string) error {
+	data, err := ioutil.ReadFile(file)
+
+	if err != nil {
+		log.Printf("Unable to ReadConfig File: %s -> %s", file, err.Error())
+		return err
+	}
+
+	conf := TemplateConfig{}
+	err = json.Unmarshal(data, &conf)
+
+	if err != nil {
+		log.Printf("Unable to load Config File: %s -> %s", file, err.Error())
+		return err
+	}
+
+	return mergo.MergeWithOverwrite(t, conf)
+}
+
+// LoadYAML loads the configuration from a yaml file
+func (t *TemplateConfig) LoadYAML(file string) error {
+	data, err := ioutil.ReadFile(file)
+
+	if err != nil {
+		log.Printf("Unable to ReadConfig File: %s -> %s", file, err.Error())
+		return err
+	}
+
+	conf := TemplateConfig{}
+	err = yaml.Unmarshal(data, &conf)
+
+	if err != nil {
+		log.Printf("Unable to load Config File: %s -> %s", file, err.Error())
+		return err
+	}
+
+	return mergo.MergeWithOverwrite(t, conf)
 }
 
 // TemplateDir provides a struct for managing template initialization per directory.
