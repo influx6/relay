@@ -50,7 +50,7 @@ func TestBasicAssets(t *testing.T) {
 }
 
 func TestTemplateAssets(t *testing.T) {
-	dirs := []string{"./fixtures/includes", "./fixtures/layouts"}
+	dirs := []string{"./fixtures/includes/index.tmpl", "./fixtures/layouts"}
 	asst, err := NewAssetTemplate("home.html", ".tmpl", dirs)
 
 	if err != nil {

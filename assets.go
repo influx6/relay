@@ -21,41 +21,53 @@ func AssetTree(dir string, ext string) (AssetMap, error) {
 		return nil, err
 	}
 
-	//do we have a directory?
-	if !stat.IsDir() {
-		return nil, NewCustomError("AssetTree", fmt.Sprintf("path is not a directory: %s", dir))
-	}
-
 	var tree = make(AssetMap)
 
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-
-		//if info is nil or is a directory when we skip
-		if info == nil || info.IsDir() {
-			return nil
-		}
-
-		var rel string
-		var rerr error
-
-		//is this path relative to the current one, if not,return err
-		if rel, rerr = filepath.Rel(dir, path); rerr != nil {
-			return rerr
-		}
+	//do we have a directory?
+	if !stat.IsDir() {
 
 		var fext string
+		var rel = filepath.Base(dir)
 
 		if strings.Index(rel, ".") != -1 {
 			fext = filepath.Ext(rel)
 		}
 
 		if fext == ext {
-			tree[rel] = filepath.ToSlash(path)
-			// tree[strings.TrimSuffix(rel, ext)] = filepath.ToSlash(path)
+			tree[rel] = filepath.ToSlash(dir)
 		}
 
-		return nil
-	})
+	} else {
+		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+
+			//if info is nil or is a directory when we skip
+			if info == nil || info.IsDir() {
+				return nil
+			}
+
+			var rel string
+			var rerr error
+
+			//is this path relative to the current one, if not,return err
+			if rel, rerr = filepath.Rel(dir, path); rerr != nil {
+				return rerr
+			}
+
+			var fext string
+
+			if strings.Index(rel, ".") != -1 {
+				fext = filepath.Ext(rel)
+			}
+
+			if fext == ext {
+				tree[rel] = filepath.ToSlash(path)
+				// tree[strings.TrimSuffix(rel, ext)] = filepath.ToSlash(path)
+			}
+
+			return nil
+		})
+
+	}
 
 	return tree, nil
 }
