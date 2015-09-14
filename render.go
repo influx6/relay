@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"html/template"
 	"mime/multipart"
 	"net/url"
-	"text/template"
 )
 
 const (
