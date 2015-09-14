@@ -51,6 +51,11 @@ var MessageDecoder = NewHTTPDecoder(func(req *HTTPRequest) (*Message, error) {
 	return loadData(req)
 })
 
+// UseHTTPEncoder wires up the MessageDecoder as an automatic decoder
+func UseHTTPEncoder(enc HTTPEncoder) HTTPCodec {
+	return NewHTTPCodec(enc, MessageDecoder)
+}
+
 //SimpleEncoder provides simple encoding that checks if the value given is a string or []byte else returns an error
 var SimpleEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, error) {
 
