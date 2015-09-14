@@ -107,6 +107,17 @@ var TextEncoder = NewHTTPEncoder(func(r *HTTPRequest, d interface{}) (int, error
 	return r.Res.Write([]byte(tx.Data))
 })
 
+// TextRender returns a text struct for rendering
+func TextRender(status int, data string) *Text {
+	return &Text{
+		Data: data,
+		Head: Head{
+			Status:  status,
+			Content: ContentText,
+		},
+	}
+}
+
 // JSONP provides a basic jsonp messages
 type JSONP struct {
 	Head
@@ -153,6 +164,19 @@ var JSONPEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, er
 
 	return req.Res.Write(fos)
 })
+
+// JSONPRender returns a jsonp struct for rendering
+func JSONPRender(status int, indent bool, callback string, data interface{}) *JSONP {
+	return &JSONP{
+		Indent:   indent,
+		Callback: callback,
+		Data:     data,
+		Head: Head{
+			Status:  status,
+			Content: ContentJSONP,
+		},
+	}
+}
 
 // JSON provides a basic json messages
 type JSON struct {
@@ -213,6 +237,20 @@ var JSONEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, err
 	return 0, nil
 })
 
+// JSONRender returns a json struct for rendering
+func JSONRender(status int, data interface{}, indent, stream, unescape bool) *JSON {
+	return &JSON{
+		Indent:       indent,
+		Stream:       stream,
+		UnEscapeHTML: unescape,
+		Data:         data,
+		Head: Head{
+			Status:  status,
+			Content: ContentJSON,
+		},
+	}
+}
+
 // HTML provides a basic html messages
 type HTML struct {
 	Head
@@ -249,6 +287,20 @@ var HTMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, err
 
 	return int(nd), err
 })
+
+// HTMLRender returns a html struct for rendering
+func HTMLRender(status int, name, layout string, binding interface{}, tl *template.Template) *HTML {
+	return &HTML{
+		Name:     name,
+		Layout:   layout,
+		Binding:  binding,
+		Template: tl,
+		Head: Head{
+			Status:  status,
+			Content: ContentHTML,
+		},
+	}
+}
 
 // XML provides a basic html messages
 type XML struct {
@@ -289,6 +341,19 @@ var XMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, erro
 
 	return req.Res.Write(res)
 })
+
+// XMLRender returns a html struct for rendering
+func XMLRender(status int, indent bool, data interface{}, prefix []byte) *XML {
+	return &XML{
+		Indent: indent,
+		Prefix: prefix,
+		Data:   data,
+		Head: Head{
+			Status:  status,
+			Content: ContentXML,
+		},
+	}
+}
 
 // ErrInvalidByteType is returned when the interface is ot a []byte
 var ErrInvalidByteType = errors.New("interface not a []byte")

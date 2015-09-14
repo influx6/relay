@@ -27,7 +27,7 @@ func NewHTTPRequest(req *http.Request, res http.ResponseWriter, params Collector
 }
 
 // Write encodes and writes the given data returns the (int,error) of the total writes while
-func (m *HTTPRequest) Write(bw []byte) (int, error) {
+func (m *HTTPRequest) Write(bw interface{}) (int, error) {
 	return m.codec.Encode(m, bw)
 }
 
