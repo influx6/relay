@@ -254,7 +254,7 @@ func JSONRender(status int, data interface{}, indent, stream, unescape bool) *JS
 // HTML provides a basic html messages
 type HTML struct {
 	Head
-	Name     string
+	// Name     string
 	Layout   string
 	Binding  interface{}
 	Template *template.Template
@@ -271,7 +271,7 @@ var HTMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, err
 
 	bou := bufPool.Get()
 
-	if err := hop.Template.ExecuteTemplate(bou, hop.Name, hop.Binding); err != nil {
+	if err := hop.Template.ExecuteTemplate(bou, hop.Layout, hop.Binding); err != nil {
 		return 0, err
 	}
 
@@ -289,9 +289,9 @@ var HTMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, err
 })
 
 // HTMLRender returns a html struct for rendering
-func HTMLRender(status int, name, layout string, binding interface{}, tl *template.Template) *HTML {
+func HTMLRender(status int, layout string, binding interface{}, tl *template.Template) *HTML {
 	return &HTML{
-		Name:     name,
+		// Name:     name,
 		Layout:   layout,
 		Binding:  binding,
 		Template: tl,
