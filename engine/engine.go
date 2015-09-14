@@ -69,6 +69,15 @@ type Folders struct {
 	Views  string `yaml:"views"`
 }
 
+// Db provides a generic db configuration value
+type Db struct {
+	Type string `yaml:"type"` //can be 'sql','mgo
+	Name string `yaml:"name"`
+	Addr string `yaml:"addr"`
+	User string `yaml:"user"`
+	Pass string `yaml:"pass"`
+}
+
 // Config provides configuration for Afro
 type Config struct {
 	Name      string `yaml:"name"`
@@ -80,6 +89,7 @@ type Config struct {
 	Killbeat  string               `yaml:killbeat`
 	C         TLSConfig            `yaml:"tls"`
 	Folders   Folders              `yaml:"folders"`
+	Db        Db                   `yaml:"db"`
 	Templates relay.TemplateConfig `yaml:"templates"`
 }
 
