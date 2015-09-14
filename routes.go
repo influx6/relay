@@ -34,6 +34,12 @@ type Routable interface {
 	Handle(http.ResponseWriter, *http.Request, Collector)
 }
 
+// Routing provide a basic route interface
+type Routing interface {
+	Handle(http.ResponseWriter, *http.Request, Collector)
+	Namespace() string
+}
+
 //Route define a specific route with its handler
 type Route struct {
 	*reggy.ClassicMatchMux
@@ -81,7 +87,7 @@ func (r *Routes) Namespace() string {
 }
 
 // Bind routes bind a router using the router namespace,except if the router namespace is an empty string
-func (r *Routes) Bind(rx *Routes) error {
+func (r *Routes) Bind(rx Routing) error {
 	if rx.Namespace() == "" {
 		return NewCustomError("Router:Namespace.Error", "namespace is aqn empty string and not allowed")
 	}
