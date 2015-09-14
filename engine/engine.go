@@ -129,7 +129,8 @@ type Engine struct {
 	//AfterInit is run right after the server is started
 	AfterInit func(*Engine)
 	//OnInit is runned immediate the server gets started
-	OnInit func(*Engine)
+	OnInit  func(*Engine)
+	OnClose func(*Engine)
 	//HeartBeats is run a constant rate every ms provided
 	HeartBeats      func(*Engine)
 	li              *graceful.Server
@@ -261,6 +262,12 @@ func (a *Engine) EngineAddr() net.Addr {
 
 // Close closes and returns an error of the internal listener
 func (a *Engine) Close() error {
+	defer func() {
+		if a.OnClose != nil {
+			a.OnClose(a)
+		}
+	}()
+
 	if a.li == nil {
 		return os.ErrInvalid
 	}
