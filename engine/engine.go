@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,6 +14,7 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/influx6/flux"
 	"github.com/influx6/relay"
+	"github.com/tylerb/graceful"
 	"gopkg.in/yaml.v2"
 )
 
@@ -23,6 +25,7 @@ var DefaultConfig = Config{
 	Folders:   Folders{},
 	Templates: relay.TemplateConfig{"./templates", nil, ".tmpl"},
 	Heartbeat: "5m",
+	Killbeat:  "2m",
 }
 
 //TLSConfig provides a base config for tls configuration
@@ -68,11 +71,13 @@ type Folders struct {
 
 // Config provides configuration for Afro
 type Config struct {
-	Name      string               `yaml:"name"`
-	APIToken  string               `yaml:"api_token"`
-	Addr      string               `yaml:"addr"`
-	Env       string               `yaml:"env"`
-	Heartbeat string               `yaml:heartbeat`
+	Name      string `yaml:"name"`
+	APIToken  string `yaml:"api_token"`
+	Addr      string `yaml:"addr"`
+	Env       string `yaml:"env"`
+	Heartbeat string `yaml:heartbeat`
+	//the timeout for graceful shutdown of server
+	Killbeat  string               `yaml:killbeat`
 	C         TLSConfig            `yaml:"tls"`
 	Folders   Folders              `yaml:"folders"`
 	Templates relay.TemplateConfig `yaml:"templates"`
@@ -108,7 +113,6 @@ func (c *Config) Load(file string) error {
 type Engine struct {
 	*relay.Routes
 	*Config
-	li       net.Listener
 	Template *relay.TemplateDir
 	//BeforeInit is run right before the server is started
 	BeforeInit func(*Engine)
@@ -117,7 +121,12 @@ type Engine struct {
 	//OnInit is runned immediate the server gets started
 	OnInit func(*Engine)
 	//HeartBeats is run a constant rate every ms provided
-	HeartBeats func(*Engine)
+	HeartBeats      func(*Engine)
+	li              *graceful.Server
+	ls              net.Listener
+	stop, heartbeat time.Duration
+	c               chan bool
+	closed          bool
 }
 
 //NewEngine returns a new app configuration
@@ -126,7 +135,11 @@ func NewEngine(c *Config, init func(*Engine)) *Engine {
 		Config:   c,
 		Routes:   relay.NewRoutes(""),
 		Template: relay.NewTemplateDir(&c.Templates),
+		c:        make(chan bool),
 	}
+
+	eo.stop = makeDuration(c.Killbeat, 20)
+	eo.heartbeat = makeDuration(c.Heartbeat, (10 * 60))
 
 	if init != nil {
 		init(eo)
@@ -155,27 +168,66 @@ func (a *Engine) loadup() error {
 }
 
 // Serve serves the app and configuration and loads the routes and serivices settings
-func (a *Engine) Serve() error {
+func (a *Engine) Serve() {
+	//start up the app server calling the .Serve()
+	go flux.RecoveryHandlerCallback("App.Engine.Serve", a.prepareServer, func(ex interface{}) {
+		//if we are in dev mode then panic,we should know when things go wrong
+		if a.Env == "dev" {
+			log.Printf("Error occured: %s will panic", ex)
+			panic(ex)
+		}
+	})
+
+	//setup the signal block and listen for the interrup
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGQUIT)
+	signal.Notify(ch, syscall.SIGTERM)
+	signal.Notify(ch, os.Interrupt)
+
+	//setup a for loop and begin calling
+	for {
+		select {
+		case <-time.After(a.heartbeat):
+			//useful info
+			if a.HeartBeats != nil {
+				a.HeartBeats(a)
+			}
+		case <-ch:
+			a.Close()
+			return
+		}
+	}
+}
+
+func (a *Engine) prepareServer() error {
 	var err error
-	var li net.Listener
+	var ls net.Listener
 
 	//run the before init function
 	if a.BeforeInit != nil {
 		a.BeforeInit(a)
 	}
 
-	if a.C.Certs != nil {
-		_, li, err = relay.CreateTLS(a.Addr, a.C.Certs, a)
-	} else {
-		_, li, err = relay.CreateHTTP(a.Addr, a)
-	}
+	ls, err = relay.MakeBaseListener(a.Addr, a.C.Certs)
 
 	if err != nil {
 		log.Fatalf("Server failed to start: %+s", err.Error())
 		return err
 	}
 
-	a.li = li
+	a.ls = ls
+	a.li = &graceful.Server{
+		NoSignalHandling: true,
+		Timeout:          a.stop,
+		Server: &http.Server{
+			Addr:    a.Addr,
+			Handler: a,
+		},
+	}
+
+	flux.GoDefer("ServerGracefulServer", func() {
+		a.li.Serve(ls)
+	})
 
 	//load up configurations
 	if err := a.loadup(); err != nil {
@@ -191,45 +243,17 @@ func (a *Engine) Serve() error {
 
 // EngineAddr returns the address of the app
 func (a *Engine) EngineAddr() net.Addr {
-	return a.li.Addr()
+	if a.ls == nil {
+		return nil
+	}
+	return a.ls.Addr()
 }
 
 // Close closes and returns an error of the internal listener
 func (a *Engine) Close() error {
-	return a.li.Close()
-}
-
-// AppSignalInit provides a wrap function thats starts up the server and loads up,awaiting for a signal to kill
-func AppSignalInit(app *Engine) {
-
-	//start up the app server calling the .Serve()
-	go flux.RecoveryHandlerCallback("App.Engine.Serve", app.Serve, func(ex interface{}) {
-		//if we are in dev mode then panic,we should know when things go wrong
-		log.Printf("Error occured: %s will panic if in dev env", ex)
-		if app.Env == "dev" {
-			panic(ex)
-		}
-	})
-
-	//setup the signal block and listen for the interrup
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGQUIT)
-	signal.Notify(ch, syscall.SIGTERM)
-	signal.Notify(ch, os.Interrupt)
-
-	hearbeat := makeDuration(app.Heartbeat, (10 * 60))
-	//setup a for loop and begin calling
-	for {
-		select {
-		case <-time.After(hearbeat):
-			//TODO: make app return info,health status and
-			//useful info
-			if app.HeartBeats != nil {
-				app.HeartBeats(app)
-			}
-		case <-ch:
-			app.Close()
-			os.Exit(0)
-		}
+	if a.li == nil {
+		return os.ErrInvalid
 	}
+	a.li.Stop(a.stop)
+	return nil
 }
