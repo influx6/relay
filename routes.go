@@ -118,8 +118,23 @@ func (r *Routes) ServeURL(ro string, res http.ResponseWriter, req *http.Request,
 				//
 				// ro = req.URL.Path
 
+				//murl represent the matching url if there is a ::: seprator
+				var murl string
+
+				//purl represent the real url preserved
+				var purl string
+
+				so := strings.Split(ro, ":::")
+				if len(so) < 2 {
+					purl = ro
+					murl = ro
+				} else {
+					murl = so[0]
+					purl = so[1]
+				}
+
 				// state, params := no.Validate(req.URL.Path)
-				state, params := no.Validate(ro)
+				state, params := no.Validate(murl)
 
 				if !state {
 					continue
@@ -130,6 +145,7 @@ func (r *Routes) ServeURL(ro string, res http.ResponseWriter, req *http.Request,
 					col.Copy(preparams)
 				}
 
+				req.URL.Path = purl
 				r.wrap(no, res, req, col)
 				// break
 				return nil
@@ -211,23 +227,29 @@ func (r *Routes) GET(pattern string, h RHandler) {
 	r.Add("get", pattern, h)
 }
 
-// Redirect sets the request to another pattern
-func (r *Routes) Redirect(method, from, to string) {
+// RedirectAll sets the request to another pattern
+func (r *Routes) RedirectAll(method, from, to string) {
 	r.Add(method, from, func(res http.ResponseWriter, req *http.Request, c Collector) {
 		http.Redirect(res, req, to, http.StatusTemporaryRedirect)
 	})
 }
 
-// RenderFrom sets the request to another url(ensure
-// func (r *Routes) RenderFrom(method, from, to string) {
-// 	r.Add(method, from, func(res http.ResponseWriter, req *http.Request, c Collector) {
-// 		r.Render(to, res, req, c)
-// 	})
-// }
+// ReRender sets the request to be rendered by another pattern rather than redirect
+func (r *Routes) ReRender(method, from, to string) {
+	r.Add(method, from, func(res http.ResponseWriter, req *http.Request, c Collector) {
+		r.Render(to, res, req, c)
+	})
+}
+
+// Redirect sets the request to be redirected to another path
+func (r *Routes) Redirect(to string, res http.ResponseWriter, req *http.Request, c Collector) {
+	http.Redirect(res, req, to, http.StatusTemporaryRedirect)
+}
 
 // Render sets the request to be handle by another path
 func (r *Routes) Render(to string, res http.ResponseWriter, req *http.Request, c Collector) {
-	req.URL.Path = to
+	newurl := fmt.Sprintf("%s:::%s", to, req.URL.Path)
+	req.URL.Path = newurl
 	r.ServeURL(to, res, req, c)
 }
 
