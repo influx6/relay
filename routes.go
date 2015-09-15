@@ -103,29 +103,34 @@ func (r *Routes) Handle(res http.ResponseWriter, req *http.Request, _ Collector)
 
 //ServeHTTP handles the a request cycle
 func (r *Routes) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	r.ServeURL(req.URL.Path, res, req, nil)
+}
+
+//ServeURL takes the url directly and serves to that path
+func (r *Routes) ServeURL(ro string, res http.ResponseWriter, req *http.Request, preparams Collector) {
 	flux.RecoveryHandler("Route:ServeHTTP", func() error {
 		r.ro.RLock()
 		defer r.ro.RUnlock()
 		mod := strings.ToLower(req.Method)
 		for _, no := range r.routes {
-
 			if no.method[mod] || no.nomethod {
-				var ro string
-
-				// check if namespace is not empty then combine the namespace else just use url path
-
-				// if r.namespace != "" {
-				// 	ro = fmt.Sprintf("%s/%s", r.namespace, req.URL.Path)
-				// } else {
-				ro = req.URL.Path
-				// }
+				// var ro string
+				//
+				// ro = req.URL.Path
 
 				// state, params := no.Validate(req.URL.Path)
 				state, params := no.Validate(ro)
+
 				if !state {
 					continue
 				}
-				r.wrap(no, res, req, Collector(params))
+
+				col := Collector(params)
+				if preparams != nil {
+					col.Copy(preparams)
+				}
+
+				r.wrap(no, res, req, col)
 				// break
 				return nil
 
@@ -204,6 +209,26 @@ func (r *Routes) HEAD(pattern string, h RHandler) {
 // GET sets the handler to only requests of this method
 func (r *Routes) GET(pattern string, h RHandler) {
 	r.Add("get", pattern, h)
+}
+
+// Redirect sets the request to another pattern
+func (r *Routes) Redirect(method, from, to string) {
+	r.Add(method, from, func(res http.ResponseWriter, req *http.Request, c Collector) {
+		http.Redirect(res, req, to, http.StatusTemporaryRedirect)
+	})
+}
+
+// RenderFrom sets the request to another url(ensure
+// func (r *Routes) RenderFrom(method, from, to string) {
+// 	r.Add(method, from, func(res http.ResponseWriter, req *http.Request, c Collector) {
+// 		r.Render(to, res, req, c)
+// 	})
+// }
+
+// Render sets the request to be handle by another path
+func (r *Routes) Render(to string, res http.ResponseWriter, req *http.Request, c Collector) {
+	req.URL.Path = to
+	r.ServeURL(to, res, req, c)
 }
 
 // ServeDir serves up a directory to the request

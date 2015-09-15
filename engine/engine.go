@@ -23,9 +23,12 @@ var DefaultConfig = Config{
 	Addr:      ":8080",
 	Env:       "dev",
 	Folders:   Folders{},
-	Templates: relay.TemplateConfig{"./templates", nil, ".tmpl"},
 	Heartbeat: "5m",
 	Killbeat:  "2m",
+	Templates: relay.TemplateConfig{
+		Dir:       "./templates",
+		Extension: ".tmpl",
+	},
 }
 
 //TLSConfig provides a base config for tls configuration
@@ -84,9 +87,9 @@ type Config struct {
 	APIToken  string `yaml:"api_token"`
 	Addr      string `yaml:"addr"`
 	Env       string `yaml:"env"`
-	Heartbeat string `yaml:heartbeat`
+	Heartbeat string `yaml:"heartbeat"`
 	//the timeout for graceful shutdown of server
-	Killbeat  string               `yaml:killbeat`
+	Killbeat  string               `yaml:"killbeat"`
 	C         TLSConfig            `yaml:"tls"`
 	Folders   Folders              `yaml:"folders"`
 	Db        Db                   `yaml:"db"`
@@ -123,7 +126,12 @@ func (c *Config) Load(file string) error {
 type Engine struct {
 	*relay.Routes
 	*Config
-	Template *relay.TemplateDir
+	li              *graceful.Server
+	ls              net.Listener
+	stop, heartbeat time.Duration
+	Template        *relay.TemplateDir
+	//HeartBeats is run a constant rate every ms provided
+	HeartBeats func(*Engine)
 	//BeforeInit is run right before the server is started
 	BeforeInit func(*Engine)
 	//AfterInit is run right after the server is started
@@ -131,13 +139,6 @@ type Engine struct {
 	//OnInit is runned immediate the server gets started
 	OnInit  func(*Engine)
 	OnClose func(*Engine)
-	//HeartBeats is run a constant rate every ms provided
-	HeartBeats      func(*Engine)
-	li              *graceful.Server
-	ls              net.Listener
-	stop, heartbeat time.Duration
-	c               chan bool
-	closed          bool
 }
 
 //NewEngine returns a new app configuration
@@ -146,15 +147,12 @@ func NewEngine(c *Config, init func(*Engine)) *Engine {
 		Config:   c,
 		Routes:   relay.NewRoutes(""),
 		Template: relay.NewTemplateDir(&c.Templates),
-		c:        make(chan bool),
+		OnInit:   init,
 	}
 
 	eo.stop = makeDuration(c.Killbeat, 20)
 	eo.heartbeat = makeDuration(c.Heartbeat, (10 * 60))
 
-	if init != nil {
-		init(eo)
-	}
 	return eo
 }
 
@@ -174,20 +172,15 @@ func (a *Engine) loadup() error {
 	if a.OnInit != nil {
 		a.OnInit(a)
 	}
-
 	return nil
 }
 
 // Serve serves the app and configuration and loads the routes and serivices settings
 func (a *Engine) Serve() {
 	//start up the app server calling the .Serve()
-	go flux.RecoveryHandlerCallback("App.Engine.Serve", a.prepareServer, func(ex interface{}) {
-		//if we are in dev mode then panic,we should know when things go wrong
-		if a.Env == "dev" {
-			log.Printf("Error occured: %s will panic", ex)
-			panic(ex)
-		}
-	})
+	if err := a.prepareServer(); err != nil {
+		panic(err)
+	}
 
 	//setup the signal block and listen for the interrup
 	ch := make(chan os.Signal, 1)

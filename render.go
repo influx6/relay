@@ -90,7 +90,7 @@ type Text struct {
 var TextEncoder = NewHTTPEncoder(func(r *HTTPRequest, d interface{}) (int, error) {
 	setUpHeadings(r)
 
-	tx, ok := d.(Text)
+	tx, ok := d.(*Text)
 
 	if !ok {
 		return 0, NewCustomError("TextEncoder", "received type is not a Text{}")
@@ -132,7 +132,7 @@ var JSONPEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, er
 	var res []byte
 	var err error
 
-	jop, ok := d.(JSONP)
+	jop, ok := d.(*JSONP)
 
 	if !ok {
 		return 0, NewCustomError("JSONP", "encoder expected JSONP type")
@@ -190,7 +190,7 @@ type JSON struct {
 //JSONEncoder provides the jsonp encoder for encoding json messages
 var JSONEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, error) {
 
-	jso, ok := d.(JSON)
+	jso, ok := d.(*JSON)
 
 	if !ok {
 		return 0, NewCustomError("JSON", "Wrong type,expected JSON type")
@@ -263,7 +263,7 @@ type HTML struct {
 //HTMLEncoder provides the jsonp encoder for encoding json messages
 var HTMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, error) {
 
-	hop, ok := d.(HTML)
+	hop, ok := d.(*HTML)
 
 	if !ok {
 		return 0, NewCustomError("HTML", "encoder received wrong type,expected HTML struct type")
@@ -313,7 +313,7 @@ type XML struct {
 //XMLEncoder provides the jsonp encoder for encoding json messages
 var XMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, error) {
 
-	jso, ok := d.(XML)
+	jso, ok := d.(*XML)
 
 	if !ok {
 		return 0, NewCustomError("XML", "Wrong type,expected XML type")
