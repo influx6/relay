@@ -16,7 +16,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
   - Codecs: Relay builds on the ideas that response should be dynamic and customizable by providing encoders and decoders of various type that allow creating flexible and encapsulated message sub-protocols(not as complex as it sounds). It embodies the idea that messages should be easily retrieved or sent to and in appropriate format with a simple and clean
 
-  - Middlewares: ingrained into the relay is the core strategy of every go http package but this is include as a optional tag on while staying pure at the router level. The middleware interface [FlatChain](https://github.com/relay/blob/master/middleware.go) provides and empowers the bindings of controllers allowing extensive stacking of behaviours without overriding the ideal of simplicity
+  - Middlewares: ingrained into the relay is the core strategy of every go http package but this is include as a optional tag on while staying pure at the router level. The middleware interface [FlatChain](https://github.com/influx6/relay/blob/master/middleware.go#L30) provides and empowers the bindings of controllers allowing extensive stacking of behaviours without overriding the ideal of simplicity
 
   - Controllers: this provide a basic encapsulation principle for a group of routine handlers and not in the sense of c of mvc. Controllers provide a simplified binding for handling connections (be it websocket or http) and embed routers to allow a more refined management of routers and subroutes
 
