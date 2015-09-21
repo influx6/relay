@@ -36,8 +36,8 @@ func (c *Controller) BindSocket(mo, pattern string, fx SocketHandler) FlatChains
 }
 
 //UpgradeSocket provides a refined control of the arguments passed to the relay.NewSocket provider
-func (c *Controller) UpgradeSocket(mo, pattern string, fx SocketHandler, up *websocket.Upgrader, ho http.Header) FlatChains {
-	so := NewSockets(up, ho, fx)
+func (c *Controller) UpgradeSocket(mo, pattern string, fx SocketHandler, up websocket.Upgrader, ho http.Header) FlatChains {
+	so := NewSockets(&up, ho, fx)
 	c.Add(mo, pattern, so.Handle)
 	return so
 }
