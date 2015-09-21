@@ -5,6 +5,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"testing"
+
+	"github.com/influx6/flux"
 )
 
 //IsWebSocketRequest returns true if a http.Request object is based on
@@ -18,7 +21,7 @@ func IsWebSocketRequest(r *http.Request) bool {
 	return hasUpgrade && hasSec && hasExt && hasKey
 }
 
-func setUpHeadings(r *HTTPRequest) {
+func setUpHeadings(r *Context) {
 	agent, ok := r.Req.Header["User-Agent"]
 
 	if ok {
@@ -44,7 +47,7 @@ func setUpHeadings(r *HTTPRequest) {
 // ErrNoBody is returned when the request has no body
 var ErrNoBody = errors.New("Http Request Has no body")
 
-func loadData(r *HTTPRequest) (*Message, error) {
+func loadData(r *Context) (*Message, error) {
 	msg := Message{}
 	msg.Method = r.Req.Method
 
@@ -97,4 +100,12 @@ func loadData(r *HTTPRequest) (*Message, error) {
 	msg.Payload = data
 
 	return &msg, nil
+}
+
+func expect(t *testing.T, v, m interface{}) {
+	if v != m {
+		flux.FatalFailed(t, "Value %+v and %+v are not a match", v, m)
+		return
+	}
+	flux.LogPassed(t, "Value %+v and %+v are a match", v, m)
 }

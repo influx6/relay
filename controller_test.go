@@ -5,8 +5,6 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-
-	"github.com/influx6/flux"
 )
 
 func TestController(t *testing.T) {
@@ -29,20 +27,11 @@ func TestControllerBinders(t *testing.T) {
 
 	admin := NewController("/admin")
 
-	_, err := admin.BindHTTP("get", "/:id", func(req *HTTPRequest) {
+	admin.BindHTTP("get", "/:id", func(req *Context, nx NextHandler) {
 		ws.Done()
-		msg, err := req.Message()
-
-		if err != nil {
-			flux.FatalFailed(t, "Unable to parse message: %s", err.Error())
-		}
-
-		expect(t, msg.Params.Get("id"), "troje_base")
-	}, nil)
-
-	if err != nil {
-		flux.FatalFailed(t, "Unable to add http handler: %s", err.Error())
-	}
+		expect(t, req.Get("id"), "troje_base")
+		nx(req)
+	})
 
 	req, _ := http.NewRequest("GET", "http://localhost:3000/admin/troje_base", nil)
 

@@ -8,7 +8,9 @@ import (
 	"encoding/xml"
 	"errors"
 	"html/template"
+	"io"
 	"mime/multipart"
+	"net/http"
 	"net/url"
 )
 
@@ -46,26 +48,26 @@ type Message struct {
 	Params      Collector
 }
 
-//MessageDecoder provides the message decoding decoder for *HTTPRequest objects
-var MessageDecoder = NewHTTPDecoder(func(req *HTTPRequest) (*Message, error) {
+//MessageDecoder provides the message decoding decoder for *Context objects
+var MessageDecoder = NewHTTPDecoder(func(req *Context) (*Message, error) {
 	return loadData(req)
 })
 
 // UseHTTPEncoder wires up the MessageDecoder as an automatic decoder
-func UseHTTPEncoder(enc HTTPEncoder) HTTPCodec {
+func UseHTTPEncoder(enc Encoder) HTTPCodec {
 	return NewHTTPCodec(enc, MessageDecoder)
 }
 
 //SimpleEncoder provides simple encoding that checks if the value given is a string or []byte else returns an error
-var SimpleEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, error) {
+var SimpleEncoder = NewEncoder(func(w io.Writer, d interface{}) (int, error) {
 
 	switch d.(type) {
 	case string:
 		so, _ := d.(string)
-		return req.Res.Write([]byte(so))
+		return w.Write([]byte(so))
 	case []byte:
 		bo, _ := d.([]byte)
-		return req.Res.Write(bo)
+		return w.Write(bo)
 	}
 
 	return 0, NewCustomError("SimpleEncoder", "data is neither a 'string' or '[]byte' type ")
@@ -78,40 +80,63 @@ var BasicHTTPCodec = NewHTTPCodec(SimpleEncoder, MessageDecoder)
 type Head struct {
 	Status  int
 	Content string
+	Headers http.Header
+}
+
+// BasicHeadEncoder provides a basic encoder for writing the response headers and
+// status information,it provides the flexibility to build even more reusable and
+// useful header writing methods
+var BasicHeadEncoder = NewHeadEncoder(func(c *Context, h *Head) error {
+	WriteHead(c, h)
+	return nil
+})
+
+// WriteHead uses a context and writes into the resposne with a head struct
+func WriteHead(c *Context, h *Head) {
+	WriteRawHead(c.Res, h)
+}
+
+//WriteRawHead writes a head struct into a ResponseWriter
+func WriteRawHead(c http.ResponseWriter, h *Head) {
+	c.WriteHeader(h.Status)
+	//copy over the headers
+	for k, v := range h.Headers {
+		for _, vs := range v {
+			c.Header().Add(k, vs)
+		}
+	}
+
+	//write the Content-Type if not a empty string, we do it down here to preserve
+	//the given value incase there was an over-write in the headers provided
+	//TODO: decide wether to use .Add() or .Set()
+
+	if h.Content != "" {
+		c.Header().Add("Content-Type", h.Content)
+	}
 }
 
 // Text provides a basic text messages
 type Text struct {
-	Head
+	*Head
 	Data string
 }
 
 //TextEncoder provides the jsonp encoder for encoding json messages
-var TextEncoder = NewHTTPEncoder(func(r *HTTPRequest, d interface{}) (int, error) {
-	setUpHeadings(r)
-
+var TextEncoder = NewEncoder(func(w io.Writer, d interface{}) (int, error) {
 	tx, ok := d.(*Text)
 
 	if !ok {
 		return 0, NewCustomError("TextEncoder", "received type is not a Text{}")
 	}
 
-	r.Res.WriteHeader(tx.Status)
-
-	if tx.Content == "" {
-		r.Res.Header().Add("Content-Type", ContentText)
-	} else {
-		r.Res.Header().Add("Content-Type", tx.Content)
-	}
-
-	return r.Res.Write([]byte(tx.Data))
+	return w.Write([]byte(tx.Data))
 })
 
 // TextRender returns a text struct for rendering
 func TextRender(status int, data string) *Text {
 	return &Text{
 		Data: data,
-		Head: Head{
+		Head: &Head{
 			Status:  status,
 			Content: ContentText,
 		},
@@ -120,15 +145,14 @@ func TextRender(status int, data string) *Text {
 
 // JSONP provides a basic jsonp messages
 type JSONP struct {
-	Head
+	*Head
 	Indent   bool
 	Callback string
 	Data     interface{}
 }
 
 //JSONPEncoder provides the jsonp encoder for encoding json messages
-var JSONPEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, error) {
-
+var JSONPEncoder = NewEncoder(func(w io.Writer, d interface{}) (int, error) {
 	var res []byte
 	var err error
 
@@ -149,20 +173,12 @@ var JSONPEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, er
 		return 0, err
 	}
 
-	if jop.Content == "" {
-		req.Res.Header().Add("Content-Type", ContentJSONP)
-	} else {
-		req.Res.Header().Add("Content-Type", jop.Content)
-	}
-	// req.Res.Header().Add("Content-Type", jop.Content)
-	req.Res.WriteHeader(jop.Status)
-
 	var fos []byte
 	fos = append(fos, []byte(jop.Callback+"(")...)
 	fos = append(fos, res...)
 	fos = append(fos, []byte(");")...)
 
-	return req.Res.Write(fos)
+	return w.Write(fos)
 })
 
 // JSONPRender returns a jsonp struct for rendering
@@ -171,7 +187,7 @@ func JSONPRender(status int, indent bool, callback string, data interface{}) *JS
 		Indent:   indent,
 		Callback: callback,
 		Data:     data,
-		Head: Head{
+		Head: &Head{
 			Status:  status,
 			Content: ContentJSONP,
 		},
@@ -180,7 +196,7 @@ func JSONPRender(status int, indent bool, callback string, data interface{}) *JS
 
 // JSON provides a basic json messages
 type JSON struct {
-	Head
+	*Head
 	Indent       bool
 	UnEscapeHTML bool
 	Stream       bool
@@ -188,7 +204,7 @@ type JSON struct {
 }
 
 //JSONEncoder provides the jsonp encoder for encoding json messages
-var JSONEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, error) {
+var JSONEncoder = NewEncoder(func(w io.Writer, d interface{}) (int, error) {
 
 	jso, ok := d.(*JSON)
 
@@ -196,17 +212,8 @@ var JSONEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, err
 		return 0, NewCustomError("JSON", "Wrong type,expected JSON type")
 	}
 
-	if jso.Content == "" {
-		req.Res.Header().Add("Content-Type", ContentJSON)
-	} else {
-		req.Res.Header().Add("Content-Type", jso.Content)
-	}
-
-	// req.Res.Header().Add("Content-Type", ContentJSON)
 	if jso.Stream {
-		// req.Res.Header().Add("Content-Type", jso.Content)
-		req.Res.WriteHeader(jso.Status)
-		return 1, json.NewEncoder(req.Res).Encode(jso.Data)
+		return 1, json.NewEncoder(w).Encode(jso.Data)
 	}
 
 	var res []byte
@@ -230,9 +237,7 @@ var JSONEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, err
 		res = bytes.Replace(res, []byte("\\u0026"), []byte("&"), -1)
 	}
 
-	req.Res.Header().Add("Content-Type", jso.Content)
-	req.Res.WriteHeader(jso.Status)
-	req.Res.Write(res)
+	w.Write(res)
 
 	return 0, nil
 })
@@ -244,7 +249,7 @@ func JSONRender(status int, data interface{}, indent, stream, unescape bool) *JS
 		Stream:       stream,
 		UnEscapeHTML: unescape,
 		Data:         data,
-		Head: Head{
+		Head: &Head{
 			Status:  status,
 			Content: ContentJSON,
 		},
@@ -253,15 +258,14 @@ func JSONRender(status int, data interface{}, indent, stream, unescape bool) *JS
 
 // HTML provides a basic html messages
 type HTML struct {
-	Head
-	// Name     string
+	*Head
 	Layout   string
 	Binding  interface{}
 	Template *template.Template
 }
 
 //HTMLEncoder provides the jsonp encoder for encoding json messages
-var HTMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, error) {
+var HTMLEncoder = NewEncoder(func(w io.Writer, d interface{}) (int, error) {
 
 	hop, ok := d.(*HTML)
 
@@ -275,13 +279,7 @@ var HTMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, err
 		return 0, err
 	}
 
-	if hop.Content == "" {
-		req.Res.Header().Add("Content-Type", ContentHTML)
-	} else {
-		req.Res.Header().Add("Content-Type", hop.Content)
-	}
-
-	nd, err := bou.WriteTo(req.Res)
+	nd, err := bou.WriteTo(w)
 
 	bufPool.Put(bou)
 
@@ -291,11 +289,10 @@ var HTMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, err
 // HTMLRender returns a html struct for rendering
 func HTMLRender(status int, layout string, binding interface{}, tl *template.Template) *HTML {
 	return &HTML{
-		// Name:     name,
 		Layout:   layout,
 		Binding:  binding,
 		Template: tl,
-		Head: Head{
+		Head: &Head{
 			Status:  status,
 			Content: ContentHTML,
 		},
@@ -304,25 +301,19 @@ func HTMLRender(status int, layout string, binding interface{}, tl *template.Tem
 
 // XML provides a basic html messages
 type XML struct {
-	Head
+	*Head
 	Indent bool
 	Prefix []byte
 	Data   interface{}
 }
 
 //XMLEncoder provides the jsonp encoder for encoding json messages
-var XMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, error) {
+var XMLEncoder = NewEncoder(func(w io.Writer, d interface{}) (int, error) {
 
 	jso, ok := d.(*XML)
 
 	if !ok {
 		return 0, NewCustomError("XML", "Wrong type,expected XML type")
-	}
-
-	if jso.Content == "" {
-		req.Res.Header().Add("Content-Type", ContentXML)
-	} else {
-		req.Res.Header().Add("Content-Type", jso.Content)
 	}
 
 	var res []byte
@@ -339,7 +330,7 @@ var XMLEncoder = NewHTTPEncoder(func(req *HTTPRequest, d interface{}) (int, erro
 		return 0, err
 	}
 
-	return req.Res.Write(res)
+	return w.Write(res)
 })
 
 // XMLRender returns a html struct for rendering
@@ -348,7 +339,7 @@ func XMLRender(status int, indent bool, data interface{}, prefix []byte) *XML {
 		Indent: indent,
 		Prefix: prefix,
 		Data:   data,
-		Head: Head{
+		Head: &Head{
 			Status:  status,
 			Content: ContentXML,
 		},
@@ -358,24 +349,15 @@ func XMLRender(status int, indent bool, data interface{}, prefix []byte) *XML {
 // ErrInvalidByteType is returned when the interface is ot a []byte
 var ErrInvalidByteType = errors.New("interface not a []byte")
 
-//ByteSocketEncoder provides the basic websocket message encoder for encoding json messages
-var ByteSocketEncoder = NewSocketEncoder(func(w *Websocket, t int, bu interface{}) (int, error) {
-	var err error
-	var size int
-
+//ByteEncoder provides the basic websocket message encoder for encoding json messages
+var ByteEncoder = NewEncoder(func(w io.Writer, bu interface{}) (int, error) {
 	bo, ok := bu.([]byte)
 
 	if !ok {
 		return 0, ErrInvalidByteType
 	}
 
-	err = w.Conn.WriteMessage(t, bo)
-
-	if err == nil {
-		size = len(bo)
-	}
-
-	return size, err
+	return w.Write(bo)
 })
 
 //ByteSocketDecoder provides the basic websocket decoder which justs returns a decoder
@@ -384,4 +366,4 @@ var ByteSocketDecoder = NewSocketDecoder(func(t int, bu []byte) (interface{}, er
 })
 
 // BasicSocketCodec returns a codec using the socket encoder and decoder
-var BasicSocketCodec = NewSocketCodec(ByteSocketEncoder, ByteSocketDecoder)
+var BasicSocketCodec = NewSocketCodec(ByteEncoder, ByteSocketDecoder)

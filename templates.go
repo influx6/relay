@@ -22,7 +22,7 @@ type TemplateConfig struct {
 // DefaultTemplateConfig provides a default TemplateConfig
 var DefaultTemplateConfig = TemplateConfig{
 	Dir:       "./templates",
-	Extension: ".tml",
+	Extension: ".tmpl",
 }
 
 // NewTemplateConfig returns a new TemplateConfig instance
@@ -83,6 +83,24 @@ func NewTemplateDir(c *TemplateConfig) *TemplateDir {
 	return &TemplateDir{filepath.Clean(c.Dir), c}
 }
 
+// MustCreate returns a new AssetTemplate with the name and path set if error occurs it panics
+func (t *TemplateDir) MustCreate(name string, paths []string, fo []template.FuncMap) *AssetTemplate {
+	as, err := t.Create(name, paths, fo)
+	if err != nil {
+		panic(err)
+	}
+	return as
+}
+
+// MustCreateExt returns a new AssetTemplate with the name and path set but allowing setting the custom extension,if error occurs it panics
+func (t *TemplateDir) MustCreateExt(name, ext string, paths []string, fo []template.FuncMap) *AssetTemplate {
+	as, err := t.CreateExt(name, ext, paths, fo)
+	if err != nil {
+		panic(err)
+	}
+	return as
+}
+
 // Create returns a new AssetTemplate with the name and path set
 func (t *TemplateDir) Create(name string, paths []string, fo []template.FuncMap) (*AssetTemplate, error) {
 	var dirs []string
@@ -91,6 +109,7 @@ func (t *TemplateDir) Create(name string, paths []string, fo []template.FuncMap)
 		dirs = append(dirs, filepath.Join(t.dir, ps))
 	}
 
+	fo = append(fo, DefaultTemplateFunctions)
 	bo := BuildAssetTemplate(name, t.config.Extension, dirs, fo, t.config.Delimiters)
 	return bo, bo.Build()
 }
@@ -103,6 +122,7 @@ func (t *TemplateDir) CreateExt(name, ext string, paths []string, fo []template.
 		dirs = append(dirs, filepath.Join(t.dir, ps))
 	}
 
+	fo = append(fo, DefaultTemplateFunctions)
 	bo := BuildAssetTemplate(name, ext, dirs, fo, t.config.Delimiters)
 
 	return bo, bo.Build()
@@ -129,9 +149,11 @@ func NewAssetTemplate(name, ext string, dirs []string) (*AssetTemplate, error) {
 // BuildAssetTemplate loads up a new AssetTemplate with the necessarily settings and builds its up.It allows creating a section combination of layout and included template assets
 func BuildAssetTemplate(name, ext string, tpaths []string, fo []template.FuncMap, delim []string) *AssetTemplate {
 	return &AssetTemplate{
+		name:  name,
 		files: tpaths,
 		ext:   ext,
 		delim: delim,
+		Funcs: fo,
 	}
 }
 

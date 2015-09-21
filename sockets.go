@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -19,23 +20,20 @@ var ErrInvalidType = errors.New("Unsupported Type")
 // Websocket provides a cover for websocket connection
 type Websocket struct {
 	*websocket.Conn
-	Req    *http.Request
-	Res    http.ResponseWriter
-	Params Collector
+	Ctx *Context
 }
 
 // WebsocketMessage provides small abstraction for processing a message
 type WebsocketMessage struct {
-	codec   SocketCodec
+	*Websocket
 	payload []byte
 	mtype   int
-	Socket  *Websocket
 	Worker  *SocketWorker
 }
 
 // Message returns the data of the socket
-func (m *WebsocketMessage) Message() (interface{}, error) {
-	return m.codec.Decode(m.mtype, m.payload)
+func (m *WebsocketMessage) Message() []byte {
+	return m.payload
 }
 
 // MessageType returns the type of the message
@@ -43,14 +41,8 @@ func (m *WebsocketMessage) MessageType() int {
 	return m.mtype
 }
 
-// Write encodes and writes the given data returns the (int,error) of the total writes while
-func (m *WebsocketMessage) Write(bw []byte) (int, error) {
-	return m.codec.Encode(m.Socket, m.mtype, bw)
-}
-
 // SocketWorker provides a workpool for socket connections
 type SocketWorker struct {
-	codec   SocketCodec
 	data    chan interface{}
 	mesgs   chan *WebsocketMessage
 	closer  chan bool
@@ -62,11 +54,10 @@ type SocketWorker struct {
 }
 
 // NewSocketWorker returns a new socketworker instance
-func NewSocketWorker(wo *Websocket, codec SocketCodec) *SocketWorker {
+func NewSocketWorker(wo *Websocket) *SocketWorker {
 	data := make(chan interface{})
 
 	sw := SocketWorker{
-		codec:  codec,
 		wo:     wo,
 		closer: make(chan bool),
 		data:   data,
@@ -92,11 +83,6 @@ func (s *SocketWorker) Messages() <-chan *WebsocketMessage {
 	})
 
 	return s.mesgs
-}
-
-// Write returns the internal socket for the worker
-func (s *SocketWorker) Write(t int, data []byte) (int, error) {
-	return s.codec.Encode(s.wo, t, data)
 }
 
 // Socket returns the internal socket for the worker
@@ -152,10 +138,10 @@ func (s *SocketWorker) manage() {
 			}
 
 			s.queue.Enqueue(&WebsocketMessage{
-				codec:   s.codec,
-				payload: do,
-				mtype:   tp,
-				Socket:  s.wo,
+				Websocket: s.wo,
+				payload:   do,
+				mtype:     tp,
+				Worker:    s,
 			})
 		}
 	}
@@ -255,45 +241,36 @@ func (s *SocketHub) manageSocket(ws *SocketWorker) {
 	}
 }
 
-// WebsocketPort provides a websocket port,handling websocket connection
-type WebsocketPort struct {
-	FlatChains
-	codec   SocketCodec
-	upgrade *websocket.Upgrader
-	headers http.Header
-	handle  SocketHandler
-}
-
-// Handle handles the reception of http request and returns a HTTPRequest object
-func (ws *WebsocketPort) Handle(res http.ResponseWriter, req *http.Request, params Collector) {
-	defer ws.FlatChains.Handle(res, req, params)
-	conn, err := ws.upgrade.Upgrade(res, req, ws.headers)
-
-	if err != nil {
-		return
-	}
-
-	flux.GoDefer(fmt.Sprintf("WebSocketPort.Handler"), func() {
-		ws.handle(NewSocketWorker(&Websocket{
-			Conn:   conn,
-			Req:    req,
-			Res:    res,
-			Params: params,
-		}, ws.codec))
-	})
-}
-
 //SocketHandler provides an handler type without the port option
 type SocketHandler func(*SocketWorker)
 
-// NewWebsocketPort returns a new websocket port
-func NewWebsocketPort(codec SocketCodec, upgrader *websocket.Upgrader, headers http.Header, hs SocketHandler) (ws *WebsocketPort) {
-	ws = &WebsocketPort{
-		FlatChains: FlatChainIdentity(),
-		codec:      codec,
-		headers:    headers,
-		upgrade:    upgrader,
-		handle:     hs,
-	}
-	return
+// NewSockets returns a new websocket port
+func NewSockets(upgrader *websocket.Upgrader, headers http.Header, hs SocketHandler) FlatChains {
+	return NewFlatChain(func(c *Context, nx NextHandler) {
+
+		if headers != nil {
+			origin, ok := c.Req.Header["Origin"]
+
+			if ok {
+				headers.Set("Access-Control-Allow-Credentials", "true")
+				headers.Set("Access-Control-Allow-Origin", strings.Join(origin, ";"))
+			} else {
+				headers.Set("Access-Control-Allow-Origin", "*")
+			}
+		}
+
+		conn, err := upgrader.Upgrade(c.Res, c.Req, headers)
+
+		if err != nil {
+			return
+		}
+
+		flux.GoDefer(fmt.Sprintf("WebSocketPort.Handler"), func() {
+			hs(NewSocketWorker(&Websocket{
+				Conn: conn,
+				Ctx:  c,
+			}))
+			nx(c)
+		})
+	})
 }

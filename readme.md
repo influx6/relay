@@ -14,9 +14,9 @@ Relay is a simple microframework with very simple designs that provide you with 
 
 #Features
 
-  - Codecs: Relay builds on the ideas that response should be dynamic and customizable,rather than creating a writer, response feed like approach, Relay uses codecs that take a response type or format and perform the operation of converting the response into the appropriate response object. This allows a custom message pattern to be created eg. binary only messages on top of http or websocket connections. Codecs have the pairs of encoders and decoders that provide the basis of transmission and reception.
+  - Codecs: Relay builds on the ideas that response should be dynamic and customizable by providing encoders and decoders of various type that allow creating flexible and encapsulated message sub-protocols(not as complex as it sounds). It embodies the idea that messages should be easily retrieved or sent to and in appropriate format with a simple and clean
 
-  - Chainable Ports: Ports are just encapsulated, chain handlers of request which is a standard feature of most golang middleware based framework.
+  - Middlewares: ingrained into the relay is the core strategy of every go http package but this is include as a optional tag on while staying pure at the router level. The middleware interface [FlatChain](https://github.com/relay/blob/master/middleware.go) provides and empowers the bindings of controllers allowing extensive stacking of behaviours without overriding the ideal of simplicity
 
   - Controllers: this provide a basic encapsulation principle for a group of routine handlers and not in the sense of c of mvc. Controllers provide a simplified binding for handling connections (be it websocket or http) and embed routers to allow a more refined management of routers and subroutes
 
@@ -78,33 +78,90 @@ Relay is a simple microframework with very simple designs that provide you with 
       //handle the request and response
     })
 
-    //the real route is /home/:id, using the internal request
-    //encapsulation in relay caslled HTTPRequest, which wraps up the request
-    //and response and uses the codecs for writing and reading data and provides a
-    // .Message()(*Message,error) which parses the body or form data according to the
-    //content type
-    home.BindHTTP("get post put","/:id",func(req *relay.HTTPRequest){
+    // Using Codecs
+    //if its an empty string then all methods are allowed
+    app.Add("","/updates",func(res http.ResponseWriter,req *http.Request,params relay.Collector){
+      //handle the request and response
+    })
+
+    // Using the BindHTTP and BindSocket/UpgradeSocket provide custom handlers that use relays Context
+    // and SocketWorker structs respectively allow a more refined and simple api call but also included
+    //with context is an internal map to localize request data for easy access instead of a global map
+    //of requests
+
+    home.BindHTTP("get post put","/:id",func(req *relay.Context){
       //...handle the custom request object
-      msg, err := req.Message()
+      msg, err := BasicHTTPCodec.Deocde(req)
       //use the msg to get Params, Body or ParseForm/Form depending
       //on the content type of request (www-urlencode, multipart,body)
-    },relay.BasicHTTPCodec) // => returns a http port
+    }) // => returns a flatchain middleware
 
     //you can also use the pure go-handler approach
     home.Get("/updates",func(res http.ResponseWriter,req *http.Request,params relay.Collector){
       //handle the request and response
     })
 
-    //the codec(last argument) argument can be nil which defaults to using the
-    //BasicHTTPCodec as the internal http codec
-    home.BindHTTP("get post put","/:names",func(req *relay.HTTPRequest){
+    //for a more refined and simpler handler using the relay.Context struct which includes
+    //a sync map for storing request data forthe lifetime of the requests
+    home.BindHTTP("get post put","/:names",func(req *relay.Context,nx relay.NextHandler){
       //handle the custom request object
-    },nil) // => returns a http port
+      nx(req)
+    }) // => returns a FlatChain middleware
+
+    ```
+
+    - Using the relay codecs system:
+
+    ```go
+
+        home.BindHTTP("get post put","/:names",func(c *relay.Context,nx relay.NextHandler){
+          //handle the custom request object
+            json := JSONRender(200,map[string]string{"user":"john"}, true, true, true)
+
+            //a special header encoder that uses the Context itself for some head writing
+            BasicHeadEncoder.Encode(c, json.Head)
+
+            //Encoders take in a io.Writer
+            JSON.Encode(c.Res, json)
+          nx(req)
+        })
+
+    ```
+
+    - Using the middlewares systems in relay
+
+    ```go
+
+      // BindHTTP returns a middleware capable of providing stacking abilities
+      home.BindHTTP("get post put","/:names",func(req *relay.Context,nx relay.NextHandler){
+        //handle the custom request object
+        nx(req)
+      }).Chain(func(c *relay.Context,nx relay.NextHandler){
+        //do something here...
+        nx(c)
+      })
+
+      var Logger = NewFlatChain(func(c *relay.Context,next relay.NextHandler){
+        log.Printf("Request: Method %s to %s",c.Req.Method,c.Req.URI.path)
+        next(c)
+      })
+
+      home.Add("get post put","/:user",Logger.Handle)
+
+      //continue chaining from that middleware
+      Logger.Chain(func(c *relay.Context,nx relay.NextHandler){
+        //do something here...
+        nx(c)
+      })
+    ```
+
+    - Using websockets:
+
+    ```go
 
     //Binding for websocket connections exists and each controller provides
     //the BindSocket and BindSocketFor where each allows a more refined control on arguments.
     //Relay provides two strategies when dealing with websocket connections:
-
 
     //Strateg one: (handling socket messages directly)
     //With websocket is the SocketWorker which encapsulates
@@ -117,11 +174,8 @@ Relay is a simple microframework with very simple designs that provide you with 
 
       for data := range soc.Messages {
 
-        //do something with the data and reply, since
-        //relay.WebsocketMessage uses the internal or supplied codec,
-        //the data can be anything you wish to return from the codec,
-        //so a (interface{},error) is returned,so you can type asset
-        words,err := data.Message()
+        //the raw message provided by gorilla.webocket
+        words := data.Message()
 
         if err != nil {
           continue
@@ -132,19 +186,12 @@ Relay is a simple microframework with very simple designs that provide you with 
         //to you,so this can be any thing your codec returns
         bu := words.([]byte)
 
-        //replies are written with the same message type
-        //as the message it received
-        //when using the 'WebsocketMessage.Write' method,
-        data.Write([]byte("ok"))
-
-        //or
-
         //using the gorilla.Conn wraped by relay.WebSocket directly
         err := data.Socket.WriteMessage(....)
       }
 
 
-    },nil) // => returns a Websocket port
+    },nil) // => returns a FlatChain middleware
 
     //Strategy two:
     //for a more chat like experience use for websocket, apart
@@ -168,12 +215,6 @@ Relay is a simple microframework with very simple designs that provide you with 
         //for more freedom you can write directly skipping the codec encoder
         other.Socket().WriteMessage(...)
 
-        //or
-
-        //use the codec encoder but with more control of the type
-        //of message we send,morphed and writing by the encoder.
-        other.Write(websocket.TextMessage,[]byte("yay! got it!"))
-
       },msg.Worker)
 
     })
@@ -181,22 +222,23 @@ Relay is a simple microframework with very simple designs that provide you with 
     // home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
     //   hub.AddConnection(soc)
     // },nil) // => returns a websocket port
-    
-    home.BindSocket("get post put","/socket",hub.AddConnection,nil) // => returns a websocket port
+
+    home.BindSocket("get post put","/socket",hub.AddConnection) // => returns a http middleware
 
 
     //BindSocketFor provides more control of what headers the socket uses,
     //the upgrade settings needed apart from the usual path,
     //request method and handler to use
-    home.BindSocketFor("get post put","/socket",func(soc *relay.SocketWorker){
+    home.UpgradeSocket("get post put","/socket",func(soc *relay.SocketWorker){
       //...
-    },BasicSocketCodec,websocket.Upgrader{
+    },websocket.Upgrader{
     	ReadBufferSize:  1024,
     	WriteBufferSize: 1024,
     },http.Header(map[string][]string{
     	"Access-Control-Allow-Credentials": []string{"true"},
     	"Access-Control-Allow-Origin":      []string{"*"},
     })) //returns a websocket port
+
 
   	app.Serve()
   ```

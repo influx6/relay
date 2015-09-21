@@ -1,46 +1,67 @@
 package relay
 
+import (
+	"io"
+)
+
 // Codecs provide a flexible approach to defining different rendering and message systems for replies without overloading the request handling code. Codecs follow the basic idea that their is an encoder and a decoder that produce and consume sets of data and handle the writing for you. This way we can create custom message patterns for response without ease and testability
 
 // Encoders accept interface{} as the data type because this allows flexible data messages to be constructed without restrictions
 
-//HTTPCodec provides a interface define method for custom message formats
-type HTTPCodec interface {
-	HTTPEncoder
-	HTTPDecoder
+//Encoder takes an inteface and encodes it into a []byte slice
+type Encoder interface {
+	Encode(io.Writer, interface{}) (int, error)
 }
 
-//HTTPEncoder takes an inteface and encodes it into a []byte slice
-type HTTPEncoder interface {
-	Encode(*HTTPRequest, interface{}) (int, error)
-}
-
-//HTTPEncodeHandler provides a handler for http encoding function
-type HTTPEncodeHandler func(*HTTPRequest, interface{}) (int, error)
+//EncodeHandler provides a handler for http encoding function
+type EncodeHandler func(io.Writer, interface{}) (int, error)
 
 //encodeBuild provides a base struct for HTTPEncoder
 type encodeBuild struct {
-	handler HTTPEncodeHandler
+	handler EncodeHandler
 }
 
 // Encode provides the HTTPEncoder encode function
-func (e *encodeBuild) Encode(r *HTTPRequest, b interface{}) (int, error) {
+func (e *encodeBuild) Encode(r io.Writer, b interface{}) (int, error) {
 	return e.handler(r, b)
 }
 
-//NewHTTPEncoder provides a nice way of build an HTTPEncoder
-func NewHTTPEncoder(fx HTTPEncodeHandler) HTTPEncoder {
+// NewEncoder provides a nice way of build an Encoder
+func NewEncoder(fx EncodeHandler) Encoder {
 	return &encodeBuild{fx}
+}
+
+// HeadEncoder takes an inteface and encodes it into a []byte slice
+type HeadEncoder interface {
+	Encode(*Context, *Head) error
+}
+
+// HeadEncodeHandler provides a handler for http encoding function
+type HeadEncodeHandler func(*Context, *Head) error
+
+//headEncodeBuild provides a base struct for HTTPEncoder
+type headEncodeBuild struct {
+	handler HeadEncodeHandler
+}
+
+// Encode provides the HTTPEncoder encode function
+func (e *headEncodeBuild) Encode(c *Context, b *Head) error {
+	return e.handler(c, b)
+}
+
+//NewHeadEncoder provides a nice way of build an http headers encoders
+func NewHeadEncoder(fx HeadEncodeHandler) HeadEncoder {
+	return &headEncodeBuild{fx}
 }
 
 // HTTPDecoder provides a single member rule that takes a []byte and decodes it into
 //its desired format
 type HTTPDecoder interface {
-	Decode(*HTTPRequest) (*Message, error)
+	Decode(*Context) (*Message, error)
 }
 
 //HTTPDecodeHandler provides a base decoder function type
-type HTTPDecodeHandler func(*HTTPRequest) (*Message, error)
+type HTTPDecodeHandler func(*Context) (*Message, error)
 
 //decodeBuild provides a base struct for HTTPEncoder
 type decodeBuild struct {
@@ -48,7 +69,7 @@ type decodeBuild struct {
 }
 
 // Decode provides the HTTPDecoder encode function
-func (e *decodeBuild) Decode(r *HTTPRequest) (*Message, error) {
+func (e *decodeBuild) Decode(r *Context) (*Message, error) {
 	return e.handler(r)
 }
 
@@ -57,38 +78,21 @@ func NewHTTPDecoder(fx HTTPDecodeHandler) HTTPDecoder {
 	return &decodeBuild{fx}
 }
 
+//HTTPCodec provides a interface define method for custom message formats
+type HTTPCodec interface {
+	Encoder
+	HTTPDecoder
+}
+
 // httpCodec represents a generic http codec
 type httpCodec struct {
-	HTTPEncoder
+	Encoder
 	HTTPDecoder
 }
 
 // NewHTTPCodec returns a new http codec
-func NewHTTPCodec(e HTTPEncoder, d HTTPDecoder) HTTPCodec {
+func NewHTTPCodec(e Encoder, d HTTPDecoder) HTTPCodec {
 	return &httpCodec{e, d}
-}
-
-//SocketEncoder takes an the arguments and encodes it with its own given operation into a acceptable format for the websocket
-type SocketEncoder interface {
-	Encode(*Websocket, int, interface{}) (int, error)
-}
-
-// SocketEncodeHandler provides an handler for socketencoder
-type SocketEncodeHandler func(*Websocket, int, interface{}) (int, error)
-
-//socEncodeBuild provides a base struct for HTTPEncoder
-type socEncodeBuild struct {
-	handler SocketEncodeHandler
-}
-
-// Decode provides the HTTPDecoder encode function
-func (e *socEncodeBuild) Encode(w *Websocket, d int, do interface{}) (int, error) {
-	return e.handler(w, d, do)
-}
-
-//NewSocketEncoder provides a nice way of build an SocketEncoder
-func NewSocketEncoder(fx SocketEncodeHandler) SocketEncoder {
-	return &socEncodeBuild{fx}
 }
 
 // SocketDecoder decodes a WebsocketMessage
@@ -116,17 +120,17 @@ func NewSocketDecoder(fx SocketDecodeHandler) SocketDecoder {
 
 //SocketCodec provides a interface define method for custom message formats
 type SocketCodec interface {
-	SocketEncoder
+	Encoder
 	SocketDecoder
 }
 
 // SocketCodeco represents a generic http codec
 type socketCodec struct {
-	SocketEncoder
+	Encoder
 	SocketDecoder
 }
 
 // NewSocketCodec returns a new http codec
-func NewSocketCodec(e SocketEncoder, d SocketDecoder) SocketCodec {
+func NewSocketCodec(e Encoder, d SocketDecoder) SocketCodec {
 	return &socketCodec{e, d}
 }

@@ -44,8 +44,25 @@ type Routing interface {
 type Route struct {
 	*reggy.ClassicMatchMux
 	handler  RHandler
-	method   map[string]bool
+	method   map[string]RHandler
 	nomethod bool
+}
+
+// Delegate takes the method and searches if the route provides an handler for it else
+// defaults to using the standard handler argument
+func (r *Route) Delegate(method string, res http.ResponseWriter, req *http.Request, c Collector) {
+	ho, ok := r.method[method]
+
+	if ok {
+		ho(res, req, c)
+		return
+	}
+
+	if r.handler == nil {
+		return
+	}
+
+	r.handler(res, req, c)
 }
 
 // PanicHandler provides a panic function type for requests
@@ -54,8 +71,7 @@ type PanicHandler func(http.ResponseWriter, *http.Request, interface{})
 //Routes is the base struct for defining interlinking routes
 type Routes struct {
 	namespace    string
-	added        map[string]int
-	routes       []*Route
+	routes       map[string]*Route
 	FailHandler  http.HandlerFunc
 	PanicHandler PanicHandler
 	ro           sync.RWMutex
@@ -71,7 +87,7 @@ func BuildRoutes(ns string, failed http.HandlerFunc, panic PanicHandler) *Routes
 	ns = reggy.TrimSlashes(ns)
 	rs := Routes{
 		namespace:    ns,
-		added:        make(map[string]int),
+		routes:       make(map[string]*Route),
 		FailHandler:  failed,
 		PanicHandler: panic,
 	}
@@ -113,7 +129,7 @@ func (r *Routes) ServeURL(ro string, res http.ResponseWriter, req *http.Request,
 		defer r.ro.RUnlock()
 		mod := strings.ToLower(req.Method)
 		for _, no := range r.routes {
-			if no.method[mod] || no.nomethod {
+			if no.nomethod || no.method[mod] != nil {
 				// var ro string
 				//
 				// ro = req.URL.Path
@@ -152,6 +168,7 @@ func (r *Routes) ServeURL(ro string, res http.ResponseWriter, req *http.Request,
 
 			}
 		}
+
 		r.doFail(res, req, nil)
 		return nil
 	})
@@ -243,13 +260,14 @@ func (r *Routes) ReRender(method, from, to string) {
 
 // Redirect sets the request to be redirected to another path
 func (r *Routes) Redirect(to string, res http.ResponseWriter, req *http.Request, c Collector) {
-	http.Redirect(res, req, to, http.StatusTemporaryRedirect)
+	http.Redirect(res, req, to, 200)
 }
 
 // Render sets the request to be handle by another path
 func (r *Routes) Render(to string, res http.ResponseWriter, req *http.Request, c Collector) {
 	newurl := fmt.Sprintf("%s:::%s", to, req.URL.Path)
 	req.URL.Path = newurl
+	req.Method = "GET"
 	r.ServeURL(to, res, req, c)
 }
 
@@ -295,6 +313,22 @@ func (r *Routes) Add(mo, pattern string, h RHandler) {
 	r.ro.Lock()
 	defer r.ro.Unlock()
 
+	var methods []string
+
+	if mo != "" {
+		cln := multispaces.ReplaceAllString(mo, " ")
+		methods = multispaces.Split(cln, -1)
+	}
+
+	if router, ok := r.routes[pattern]; ok {
+		for _, ro := range methods {
+			if _, ok := router.method[ro]; !ok {
+				router.method[ro] = h
+			}
+		}
+		return
+	}
+
 	var fatt string
 
 	if r.namespace != "" {
@@ -303,41 +337,30 @@ func (r *Routes) Add(mo, pattern string, h RHandler) {
 		fatt = pattern
 	}
 
-	var mod = make(map[string]bool)
+	var mod = make(map[string]RHandler)
 
-	if mo != "" {
-		cln := multispaces.ReplaceAllString(mo, " ")
-
-		amod := multispaces.Split(cln, -1)
-
-		for _, ro := range amod {
-			mod[ro] = true
-		}
+	for _, ro := range methods {
+		mod[ro] = h
 	}
 
-	if _, ok := r.added[pattern]; !ok {
-		r.added[pattern] = len(r.routes)
-		r.routes = append(r.routes, &Route{
-			ClassicMatchMux: reggy.CreateClassic(fatt),
-			handler:         h,
-			method:          mod,
-			nomethod:        len(mod) == 0,
-		})
+	r.routes[pattern] = &Route{
+		ClassicMatchMux: reggy.CreateClassic(fatt),
+		handler:         h,
+		method:          mod,
+		nomethod:        len(mod) == 0,
 	}
+}
+
+// GetRoute returns Route that fits the pattern
+func (r *Routes) GetRoute(pattern string) (*Route, bool) {
+	ro, ok := r.routes[pattern]
+	return ro, ok
 }
 
 // HasRoute returns true/false if the pattern exists
 func (r *Routes) HasRoute(pattern string) bool {
-	_, ok := r.added[pattern]
+	_, ok := r.routes[pattern]
 	return ok
-}
-
-// FindRoute returns the route that matches the pattern
-func (r *Routes) FindRoute(pattern string) (*Route, error) {
-	if !r.HasRoute(pattern) {
-		return nil, ErrorNotFind
-	}
-	return r.routes[r.added[pattern]], nil
 }
 
 func (r *Routes) recover(res http.ResponseWriter, req *http.Request) {
@@ -360,5 +383,5 @@ func (r *Routes) doFail(res http.ResponseWriter, req *http.Request, ps Collector
 
 func (r *Routes) wrap(rw *Route, res http.ResponseWriter, req *http.Request, ps Collector) {
 	defer r.recover(res, req)
-	rw.handler(res, req, ps)
+	rw.Delegate(strings.ToLower(req.Method), res, req, ps)
 }
