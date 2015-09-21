@@ -122,7 +122,7 @@ Relay is a simple microframework with very simple designs that provide you with 
             BasicHeadEncoder.Encode(c, json.Head)
 
             //Encoders take in a io.Writer
-            JSON.Encode(c.Res, json)
+            JSONEncoder.Encode(c.Res, json)
           nx(req)
         })
 
