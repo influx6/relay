@@ -28,9 +28,9 @@ func NewController(name string) *Controller {
 }
 
 // BindSocket returns provides a handle that turns http requests into websocket requests using relay.socketworkers
-func (c *Controller) BindSocket(mo, pattern string, fx SocketHandler) FlatChains {
+func (c *Controller) BindSocket(mo, pattern string, fx SocketHandler, ho http.Header) FlatChains {
 	do := dupgrade
-	so := NewSockets(&do, http.Header(map[string][]string{}), fx)
+	so := NewSockets(&do, ho, fx)
 	c.Add(mo, pattern, so.Handle)
 	return so
 }

@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/imdario/mergo"
-	"github.com/influx6/relay"
+	"github.com/influx6/assets"
 	"gopkg.in/yaml.v2"
 )
 
@@ -14,17 +14,17 @@ var DefaultClientConfig = ClientConfig{
 	Addr:      "",
 	Env:       "dev",
 	Folders:   Folders{},
-	Templates: relay.TemplateConfig{"./templates", nil, ".tmpl"},
+	Templates: assets.TemplateConfig{"./templates", nil, ".tmpl"},
 }
 
 // ClientConfig provides configuration for Afro
 type ClientConfig struct {
-	Name      string               `yaml:"name"`
-	Folders   Folders              `yaml:"folders"`
-	APIToken  string               `yaml:"api_token"`
-	Addr      string               `yaml:"addr"`
-	Env       string               `yaml:"env"`
-	Templates relay.TemplateConfig `yaml:"templates"`
+	Name      string                `yaml:"name"`
+	Folders   Folders               `yaml:"folders"`
+	APIToken  string                `yaml:"api_token"`
+	Addr      string                `yaml:"addr"`
+	Env       string                `yaml:"env"`
+	Templates assets.TemplateConfig `yaml:"templates"`
 }
 
 // NewClientConfig returns a new configuration file

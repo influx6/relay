@@ -14,6 +14,7 @@ type Context struct {
 	*SyncCollector
 	Req *http.Request
 	Res ResponseWriter
+	// sock *SocketWorker
 }
 
 // NewContext returns a new http context

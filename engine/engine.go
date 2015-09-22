@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/imdario/mergo"
+	"github.com/influx6/assets"
 	"github.com/influx6/flux"
 	"github.com/influx6/relay"
 	"github.com/tylerb/graceful"
@@ -25,7 +26,7 @@ var DefaultConfig = Config{
 	Folders:   Folders{},
 	Heartbeat: "5m",
 	Killbeat:  "2m",
-	Templates: relay.TemplateConfig{
+	Templates: assets.TemplateConfig{
 		Dir:       "./templates",
 		Extension: ".tmpl",
 	},
@@ -89,11 +90,11 @@ type Config struct {
 	Env       string `yaml:"env"`
 	Heartbeat string `yaml:"heartbeat"`
 	//the timeout for graceful shutdown of server
-	Killbeat  string               `yaml:"killbeat"`
-	C         TLSConfig            `yaml:"tls"`
-	Folders   Folders              `yaml:"folders"`
-	Db        Db                   `yaml:"db"`
-	Templates relay.TemplateConfig `yaml:"templates"`
+	Killbeat  string                `yaml:"killbeat"`
+	C         TLSConfig             `yaml:"tls"`
+	Folders   Folders               `yaml:"folders"`
+	Db        Db                    `yaml:"db"`
+	Templates assets.TemplateConfig `yaml:"templates"`
 }
 
 // NewConfig returns a new configuration file
@@ -129,7 +130,7 @@ type Engine struct {
 	li              *graceful.Server
 	ls              net.Listener
 	stop, heartbeat time.Duration
-	Template        *relay.TemplateDir
+	Template        *assets.TemplateDir
 	//HeartBeats is run a constant rate every ms provided
 	HeartBeats func(*Engine)
 	//BeforeInit is run right before the server is started
@@ -146,7 +147,7 @@ func NewEngine(c *Config, init func(*Engine)) *Engine {
 	eo := &Engine{
 		Config:   c,
 		Routes:   relay.NewRoutes(""),
-		Template: relay.NewTemplateDir(&c.Templates),
+		Template: assets.NewTemplateDir(&c.Templates),
 		OnInit:   init,
 	}
 

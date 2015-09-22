@@ -128,7 +128,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
     ```
 
-    - Using the middlewares systems in relay
+    - Using the middleware system in relay
 
     ```go
 
@@ -191,7 +191,7 @@ Relay is a simple microframework with very simple designs that provide you with 
       }
 
 
-    }) // => returns a FlatChain middleware
+    },nil) // => returns a FlatChain middleware
 
     //Strategy two:
     //for a more chat like experience use for websocket, apart
@@ -219,12 +219,12 @@ Relay is a simple microframework with very simple designs that provide you with 
 
     })
 
-    home.BindSocket("get post put","/socket",hub.AddConnection) // => returns a http middleware
+    home.BindSocket("get post put","/socket",hub.AddConnection,nil) // => returns a http middleware
 
     //BindSocketFor provides more control of what headers the socket uses,
     //the upgrade settings needed apart from the usual path,
     //request method and handler to use
-    home.UpgradeSocket("get post put","/socket",func(soc *relay.SocketWorker){
+    home.UpgradeSocket("","/socket",func(soc *relay.SocketWorker){
       //...
     },websocket.Upgrader{
     	ReadBufferSize:  1024,
