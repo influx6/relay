@@ -1,5 +1,6 @@
 #Relay
 [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/influx6/relay)
+[![Travis]](https://travis-ci.org/influx6/relay.svg?branch=master)
 
 Relay is a simple microframework with very simple designs that provide you with the minimal tools you need to get things running.
 
