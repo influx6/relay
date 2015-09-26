@@ -13,6 +13,11 @@ func NewCollector() Collector {
 	return make(Collector)
 }
 
+//ToMap makes a new clone of this map[string]interface{}
+func (c Collector) ToMap() map[string]interface{} {
+	return c.Clone()
+}
+
 //Clone makes a new clone of this collector
 func (c Collector) Clone() Collector {
 	col := make(Collector)
@@ -110,6 +115,15 @@ func (c *SyncCollector) Clone() *SyncCollector {
 
 	so := SyncCollector{c: co}
 	return &so
+}
+
+//ToMap makes a new clone of this map[string]interface{}
+func (c *SyncCollector) ToMap() map[string]interface{} {
+	var co Collector
+	c.rw.RLock()
+	co = c.c.Clone()
+	c.rw.RUnlock()
+	return co
 }
 
 //Remove deletes a key:value pair

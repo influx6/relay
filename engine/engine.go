@@ -183,6 +183,8 @@ func (a *Engine) Serve() {
 		panic(err)
 	}
 
+	log.Printf("Application %s running @ %s", a.Name, a.Addr)
+
 	//setup the signal block and listen for the interrup
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGQUIT)
