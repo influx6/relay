@@ -126,7 +126,9 @@ func (c *Config) Load(file string) error {
 		return err
 	}
 
-	if strings.Contains(c.Env, "production") || c.Env == "prod" || c.Env == "pro" {
+	c.Env = strings.TrimSpace(c.Env)
+
+	if !strings.Contains(c.Env, "development") && (c.Env != "dev") && (c.Env != "development") {
 		c.IsProduction = true
 	}
 
