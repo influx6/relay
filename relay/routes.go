@@ -84,7 +84,10 @@ func NewRoutes(ns string) *Routes {
 
 //BuildRoutes returns a new Routes instance
 func BuildRoutes(ns string, failed http.HandlerFunc, panic PanicHandler) *Routes {
-	ns = reggy.TrimSlashes(ns)
+	// if ns != "/" {
+	// 	ns = reggy.TrimSlashes(ns)
+	// }
+	//
 	rs := Routes{
 		namespace:    ns,
 		routes:       make(map[string]*Route),
@@ -105,11 +108,10 @@ func (r *Routes) Namespace() string {
 // Bind routes bind a router using the router namespace,except if the router namespace is an empty string
 func (r *Routes) Bind(rx Routing) error {
 	if rx.Namespace() == "" {
-		return NewCustomError("Router:Namespace.Error", "namespace is aqn empty string and not allowed")
+		return NewCustomError("Router:Namespace.Error", fmt.Sprintf("namespace is empty string and not allowed: (%s)", rx.Namespace()))
 	}
 
-	r.Add("", rx.Namespace(), rx.Handle)
-	return nil
+	return r.Add("", rx.Namespace(), rx.Handle)
 }
 
 //Handle provides a router handler for handling routes incoming from other routers
@@ -152,6 +154,7 @@ func (r *Routes) ServeURL(ro string, res http.ResponseWriter, req *http.Request,
 				// state, params := no.Validate(req.URL.Path)
 				state, params := no.Validate(murl)
 
+				// log.Printf("Checking %s for %s -> %s", no.Pattern, murl, state)
 				if !state {
 					continue
 				}
@@ -309,7 +312,7 @@ func (r *Routes) ServeFile(pattern, file string) {
 var multispaces = regexp.MustCompile(`\s+`)
 
 // Add adds a route into the sets of routes, method can be "" to allow all methods to be handled or a stringed range eg "get head put" to allow this range of methods(get,head,put) only for the handler
-func (r *Routes) Add(mo, pattern string, h RHandler) {
+func (r *Routes) Add(mo, pattern string, h RHandler) error {
 	r.ro.Lock()
 	defer r.ro.Unlock()
 
@@ -320,13 +323,17 @@ func (r *Routes) Add(mo, pattern string, h RHandler) {
 		methods = multispaces.Split(cln, -1)
 	}
 
-	if router, ok := r.routes[pattern]; ok {
+	router, ok := r.routes[pattern]
+
+	if ok {
 		for _, ro := range methods {
 			if _, ok := router.method[ro]; !ok {
 				router.method[ro] = h
+			} else {
+				return ErrPatternBound
 			}
 		}
-		return
+		return nil
 	}
 
 	var fatt string
@@ -349,6 +356,8 @@ func (r *Routes) Add(mo, pattern string, h RHandler) {
 		method:          mod,
 		nomethod:        len(mod) == 0,
 	}
+
+	return nil
 }
 
 // GetRoute returns Route that fits the pattern

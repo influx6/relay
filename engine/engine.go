@@ -8,13 +8,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/imdario/mergo"
 	"github.com/influx6/assets"
 	"github.com/influx6/flux"
-	"github.com/influx6/relay"
+	"github.com/influx6/relay/relay"
 	"github.com/tylerb/graceful"
 	"gopkg.in/yaml.v2"
 )
@@ -90,11 +91,12 @@ type Config struct {
 	Env       string `yaml:"env"`
 	Heartbeat string `yaml:"heartbeat"`
 	//the timeout for graceful shutdown of server
-	Killbeat  string                `yaml:"killbeat"`
-	C         TLSConfig             `yaml:"tls"`
-	Folders   Folders               `yaml:"folders"`
-	Db        Db                    `yaml:"db"`
-	Templates assets.TemplateConfig `yaml:"templates"`
+	Killbeat     string                `yaml:"killbeat"`
+	C            TLSConfig             `yaml:"tls"`
+	Folders      Folders               `yaml:"folders"`
+	Db           Db                    `yaml:"db"`
+	Templates    assets.TemplateConfig `yaml:"templates"`
+	IsProduction bool                  `yaml:"-"`
 }
 
 // NewConfig returns a new configuration file
@@ -120,7 +122,15 @@ func (c *Config) Load(file string) error {
 		return err
 	}
 
-	return mergo.MergeWithOverwrite(c, conf)
+	if err := mergo.MergeWithOverwrite(c, conf); err != nil {
+		return err
+	}
+
+	if strings.Contains(c.Env, "production") || c.Env == "prod" || c.Env == "pro" {
+		c.IsProduction = true
+	}
+
+	return nil
 }
 
 //Engine provides a base luncher for a service
@@ -145,10 +155,10 @@ type Engine struct {
 //NewEngine returns a new app configuration
 func NewEngine(c *Config, init func(*Engine)) *Engine {
 	eo := &Engine{
-		Config:   c,
-		Routes:   relay.NewRoutes(""),
-		Template: assets.NewTemplateDir(&c.Templates),
-		OnInit:   init,
+		Config: c,
+		Routes: relay.NewRoutes(""),
+		// Template: assets.NewTemplateDir(&c.Templates),
+		OnInit: init,
 	}
 
 	eo.stop = makeDuration(c.Killbeat, 20)
@@ -159,16 +169,16 @@ func NewEngine(c *Config, init func(*Engine)) *Engine {
 
 func (a *Engine) loadup() error {
 	//is the asset folder not empty?, if so load it up
-	if a.Folders.Assets != "" {
-
-		log.Printf("Setting up assets dir: %s", a.Folders.Assets)
-		if _, err := os.Stat(a.Folders.Assets); err != nil {
-			return err
-		}
-
-		a.ServeDir("/assets", a.Folders.Assets, "/assets/")
-		log.Printf("Done loading assets dir: %s", a.Folders.Assets)
-	}
+	// if a.Folders.Assets != "" {
+	//
+	// 	log.Printf("Setting up assets dir: %s", a.Folders.Assets)
+	// 	if _, err := os.Stat(a.Folders.Assets); err != nil {
+	// 		return err
+	// 	}
+	//
+	// 	a.ServeDir("/assets", a.Folders.Assets, "/assets/")
+	// 	log.Printf("Done loading assets dir: %s", a.Folders.Assets)
+	// }
 
 	if a.OnInit != nil {
 		a.OnInit(a)

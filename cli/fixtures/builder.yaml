@@ -1,0 +1,15 @@
+name: builder
+addr: :6000
+env: production
+
+hearbeat: 5m
+
+client:
+  dir: ./client
+
+static:
+  dir: ./static
+
+package: bitbucket.org/flow/builder
+
+vfs: ./vfs
