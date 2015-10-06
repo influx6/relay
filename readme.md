@@ -14,113 +14,118 @@ Relay is a simple microframework with very simple designs that provide you with 
 
 # Usage
 
-      ```bash
+    - Command Example:
+        ```bash
 
-        # once installation is done using 'go get'
+          # once installation is done using 'go get'
 
-        > relay
-          λ relay
-            relay provides a cli for relay projects
+          > relay
+            λ relay
+              relay provides a cli for relay projects
 
-            Usage:
-            relay [command]
+              Usage:
+              relay [command]
 
-            Available Commands:
-            build       build the current relay project into a binary
-            serve       serves up the project and watches for changes
-            create      creates the relay project files and directory with the given name
+              Available Commands:
+              build       build the current relay project into a binary
+              serve       serves up the project and watches for changes
+              create      creates the relay project files and directory with the given name
 
-            Flags:
-            -h, --help[=false]: help for relay
+              Flags:
+              -h, --help[=false]: help for relay
 
-            Use "relay [command] --help" for more information about a command.
+              Use "relay [command] --help" for more information about a command.
 
 
-        # to create a project directory just call the 'create' command giving the flag for the name of the project folder
-        # and the --owner (i.e the name of your folder with the /src/github structure of go projects), this is used to
-        # generate the package name and can be change accordingly in the "app.yaml" file
+          # to create a project directory just call the 'create' command giving the flag for the name of the project folder
+          # and the --owner (i.e the name of your folder with the /src/github structure of go projects), this is used to
+          # generate the package name and can be change accordingly in the "app.yaml" file
 
-        > relay create --name wonderbat --owner influx6
+          > relay create --name wonderbat --owner influx6
 
-          λ relay create --name wonderbat --owner influx6
-            -> New relay Project: wonderbat, Owner: influx6 ...
-            --> Creating 'wonderbat' project directory -> ./relay
-            --> Creating 'bin' project directory
-            --> Creating 'client' project directory
-            --> Creating 'client/app' project directory
-            --> Creating 'controllers' project directory
-            --> Creating 'models' project directory
-            --> Creating 'templates' project directory
-            --> Creating 'static' project directory
-            --> Creating 'vfs' project directory
-            --> Creating 'vendor' project directory
-            --> Creating project file: main.go
-            --> Creating project file: controllers/controllers.go
-            --> Creating project file: vfs/vfs_static.go
-            --> Creating project file: app.yml
-            --> Creating project file: client/client.go
-            --> Creating project file: client/app/app.go  
+            λ relay create --name wonderbat --owner influx6
+              -> New relay Project: wonderbat, Owner: influx6 ...
+              --> Creating 'wonderbat' project directory -> ./relay
+              --> Creating 'bin' project directory
+              --> Creating 'client' project directory
+              --> Creating 'client/app' project directory
+              --> Creating 'controllers' project directory
+              --> Creating 'models' project directory
+              --> Creating 'templates' project directory
+              --> Creating 'static' project directory
+              --> Creating 'vfs' project directory
+              --> Creating 'vendor' project directory
+              --> Creating project file: main.go
+              --> Creating project file: controllers/controllers.go
+              --> Creating project file: vfs/vfs_static.go
+              --> Creating project file: app.yml
+              --> Creating project file: client/client.go
+              --> Creating project file: client/app/app.go  
 
-    ```
+      ```
+
 
     - Where "app.yaml" contains =>
-    ```yaml
-              name: wonderbat
-              addr: :4000
-              env: dev
 
-              hearbeat: 5m
+      ```yaml
+                name: wonderbat
+                addr: :4000
+                env: dev
+
+                hearbeat: 5m
 
 
-              # output folder for go virtualfiles
-              vfs: ./vfs
+                # output folder for go virtualfiles
+                vfs: ./vfs
 
-              # directory and settings for static code
-              static:
-                dir: ./static
+                # directory and settings for static code
+                static:
+                  dir: ./static
 
-              # directory to locate client gopherjs code
-              client:
-                  dir: ./client
+                # directory to locate client gopherjs code
+                client:
+                    dir: ./client
 
-              # change this to fit appropriately if using a different scheme
-              package: github.com/influx6/wonderbat
+                # change this to fit appropriately if using a different scheme
+                package: github.com/influx6/wonderbat
 
-    ```
+      ```
+
 
     - where "main.go" contains =>
-    ```
-              package main
 
-              import (
-              	//remove the _ when ready to use
-              	_ "github.com/influx6/wonderbat/controllers"
-              	"github.com/influx6/wonderbat/vfs"
+      ```go
+                package main
 
-              	"net/http"
+                import (
+                	//remove the _ when ready to use
+                	_ "github.com/influx6/wonderbat/controllers"
+                	"github.com/influx6/wonderbat/vfs"
 
-              	"github.com/influx6/relay/engine"
-              	"github.com/influx6/relay/relay"
-              )
+                	"net/http"
 
-              func main() {
+                	"github.com/influx6/relay/engine"
+                	"github.com/influx6/relay/relay"
+                )
 
-              	server := engine.NewEngine(engine.NewConfig(), func(app *engine.Engine) {
+                func main() {
 
-                  //using the auto-build virtual fs static assets
-              		vfsPro := http.FileServer(vfs.FS(app.IsProduction))
-              		app.GET("/static/*", relay.WrapRouteHandler(vfsPro))
+                	server := engine.NewEngine(engine.NewConfig(), func(app *engine.Engine) {
 
-              	})
+                    //using the auto-build virtual fs static assets
+                		vfsPro := http.FileServer(vfs.FS(app.IsProduction))
+                		app.GET("/static/*", relay.WrapRouteHandler(vfsPro))
 
-              	if err := server.Load("./app.yml"); err != nil {
-              		panic(err)
-              	}
+                	})
 
-              	server.Serve()
+                	if err := server.Load("./app.yml"); err != nil {
+                		panic(err)
+                	}
 
-              }
-    ```
+                	server.Serve()
+
+                }
+      ```
 
 
 # Example
