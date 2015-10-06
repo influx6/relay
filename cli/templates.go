@@ -225,7 +225,7 @@ static:
 client:
     dir: ./client
 
-# change this to fit appropriately if using a different sheme
+# change this to fit appropriately if using a different scheme
 package: %s
 
 `

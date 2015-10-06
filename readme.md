@@ -12,8 +12,85 @@ Relay is a simple microframework with very simple designs that provide you with 
 
      go install github.com/influx6/relay/...
 
+# Usage
 
-#Features
+    ```bash
+
+      # once installation is done using 'go get'
+
+      > relay
+        λ relay
+          relay provides a cli for relay projects
+
+          Usage:
+          relay [command]
+
+          Available Commands:
+          build       build the current relay project into a binary
+          serve       serves up the project and watches for changes
+          create      creates the relay project files and directory with the given name
+
+          Flags:
+          -h, --help[=false]: help for relay
+
+          Use "relay [command] --help" for more information about a command.
+
+
+      # to create a project directory just call the 'create' command giving the flag for the name of the project folder
+      # and the --owner (i.e the name of your folder with the /src/github structure of go projects), this is used to
+      # generate the package name and can be change accordingly in the "app.yaml" file
+
+      > relay create --name wonderbat --owner influx6
+
+        λ relay create --name wonderbat --owner influx6
+          -> New relay Project: wonderbat, Owner: influx6 ...
+          --> Creating 'wonderbat' project directory -> ./relay
+          --> Creating 'bin' project directory
+          --> Creating 'client' project directory
+          --> Creating 'client/app' project directory
+          --> Creating 'controllers' project directory
+          --> Creating 'models' project directory
+          --> Creating 'templates' project directory
+          --> Creating 'static' project directory
+          --> Creating 'vfs' project directory
+          --> Creating 'vendor' project directory
+          --> Creating project file: main.go
+          --> Creating project file: controllers/controllers.go
+          --> Creating project file: vfs/vfs_static.go
+          --> Creating project file: app.yml
+          --> Creating project file: client/client.go
+          --> Creating project file: client/app/app.go  
+
+
+              where "app.yaml" contains =>
+                    name: wonderbat
+                    addr: :4000
+                    env: dev
+
+                    hearbeat: 5m
+
+
+                    # output folder for go virtualfiles
+                    vfs: ./vfs
+
+                    # directory and settings for static code
+                    static:
+                      dir: ./static
+
+                    # directory to locate client gopherjs code
+                    client:
+                        dir: ./client
+
+                    # change this to fit appropriately if using a different scheme
+                    package: github.com/influx6/wonderbat
+
+
+      ```
+  ```
+
+# Features
+
+  - Cli commander: Included with the installation of relay is the relay command line utility which comes installed with  a `create` command which builds a relay style directory structure, a `build` command which will build and bundle up all assets into a single binary and the `serve` command to serve and rebuild on file changes
 
   - Codecs: Relay builds on the ideas that response should be dynamic and customizable by providing encoders and decoders of various type that allow creating flexible and encapsulated message sub-protocols(not as complex as it sounds). It embodies the idea that messages should be easily retrieved or sent to and in appropriate format with a simple and clean
 
