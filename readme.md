@@ -12,9 +12,12 @@ Relay is a simple microframework with very simple designs that provide you with 
 
      go install github.com/influx6/relay/...
 
+
 # Usage
 
-    - Command Example:
+   - Command Example:
+    
+               
         ```bash
 
           # once installation is done using 'go get'
@@ -65,7 +68,9 @@ Relay is a simple microframework with very simple designs that provide you with 
       ```
 
 
-    - Where "app.yaml" contains =>
+
+   - Where "app.yaml" contains =>
+    
 
       ```yaml
                 name: wonderbat
@@ -89,10 +94,11 @@ Relay is a simple microframework with very simple designs that provide you with 
                 # change this to fit appropriately if using a different scheme
                 package: github.com/influx6/wonderbat
 
-      ```
+      ``` 
 
 
-    - where "main.go" contains =>
+   - where "main.go" contains =>
+    
 
       ```go
                 package main
