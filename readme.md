@@ -17,8 +17,9 @@ Relay is a simple microframework with very simple designs that provide you with 
 
    - Command Example:
     
-               
-        ```bash
+    
+                         
+         ```bash
 
           # once installation is done using 'go get'
 
@@ -65,7 +66,7 @@ Relay is a simple microframework with very simple designs that provide you with 
               --> Creating project file: client/client.go
               --> Creating project file: client/app/app.go  
 
-      ```
+        ```
 
 
 
@@ -132,6 +133,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
                 }
       ```
+
 
 
 # Example
