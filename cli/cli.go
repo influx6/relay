@@ -262,21 +262,26 @@ var builder = func(config *BuildConfig) error {
 
 	fmt.Printf("Using StripPrefix (%s) for all virtual paths \n", strip)
 
+	var done = make(chan bool)
+
 	err = BundleStatic(virtualfile, "vfs", config.Static.Exclude, pwd, virtualsets, nil, func() error {
-		fmt.Printf("Building binary file into %s\n", config.Bin)
-
-		_, err = Gobuild(config.Bin, binName)
-
-		if err != nil {
-			fmt.Printf("go.build.Error: %s\n", err)
-			return err
-		}
-
+		close(done)
 		return nil
 	})
 
 	if err != nil {
 		fmt.Printf("go.mkdir.vfs.static: for %s -> %s\n", virtualfile, err)
+		return err
+	}
+
+	<-done
+
+	fmt.Printf("Building binary file into %s\n", config.Bin)
+
+	_, err = Gobuild(config.Bin, binName)
+
+	if err != nil {
+		fmt.Printf("go.build.Error: %s\n", err)
 		return err
 	}
 
