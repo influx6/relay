@@ -61,31 +61,67 @@ Relay is a simple microframework with very simple designs that provide you with 
             --> Creating project file: client/client.go
             --> Creating project file: client/app/app.go  
 
+    ```
 
-                where "app.yaml" contains =>
-                      name: wonderbat
-                      addr: :4000
-                      env: dev
+    - Where "app.yaml" contains =>
+    ```yaml
+              name: wonderbat
+              addr: :4000
+              env: dev
 
-                      hearbeat: 5m
+              hearbeat: 5m
 
 
-                      # output folder for go virtualfiles
-                      vfs: ./vfs
+              # output folder for go virtualfiles
+              vfs: ./vfs
 
-                      # directory and settings for static code
-                      static:
-                        dir: ./static
+              # directory and settings for static code
+              static:
+                dir: ./static
 
-                      # directory to locate client gopherjs code
-                      client:
-                          dir: ./client
+              # directory to locate client gopherjs code
+              client:
+                  dir: ./client
 
-                      # change this to fit appropriately if using a different scheme
-                      package: github.com/influx6/wonderbat
-
+              # change this to fit appropriately if using a different scheme
+              package: github.com/influx6/wonderbat
 
     ```
+
+    - where "main.go" contains =>
+    ```
+              package main
+
+              import (
+              	//remove the _ when ready to use
+              	_ "github.com/influx6/wonderbat/controllers"
+              	"github.com/influx6/wonderbat/vfs"
+
+              	"net/http"
+
+              	"github.com/influx6/relay/engine"
+              	"github.com/influx6/relay/relay"
+              )
+
+              func main() {
+
+              	server := engine.NewEngine(engine.NewConfig(), func(app *engine.Engine) {
+
+                  //using the auto-build virtual fs static assets
+              		vfsPro := http.FileServer(vfs.FS(app.IsProduction))
+              		app.GET("/static/*", relay.WrapRouteHandler(vfsPro))
+
+              	})
+
+              	if err := server.Load("./app.yml"); err != nil {
+              		panic(err)
+              	}
+
+              	server.Serve()
+
+              }
+    ```
+
 
 # Example
 
