@@ -262,19 +262,21 @@ var builder = func(config *BuildConfig) error {
 
 	fmt.Printf("Using StripPrefix (%s) for all virtual paths \n", strip)
 
-	err = BundleStatic(virtualfile, "vfs", config.Static.Exclude, pwd, virtualsets, nil)
+	err = BundleStatic(virtualfile, "vfs", config.Static.Exclude, pwd, virtualsets, nil, func() error {
+		fmt.Printf("Building binary file into %s\n", config.Bin)
+
+		_, err = Gobuild(config.Bin, binName)
+
+		if err != nil {
+			fmt.Printf("go.build.Error: %s\n", err)
+			return err
+		}
+
+		return nil
+	})
 
 	if err != nil {
 		fmt.Printf("go.mkdir.vfs.static: for %s -> %s\n", virtualfile, err)
-		return err
-	}
-
-	fmt.Printf("Building binary file into %s\n", config.Bin)
-
-	_, err = Gobuild(config.Bin, binName)
-
-	if err != nil {
-		fmt.Printf("go.build.Error: %s\n", err)
 		return err
 	}
 
@@ -342,7 +344,7 @@ var serveCommand = &cobra.Command{
 			return
 		}
 
-		config.Watcher.Skip = append(config.Watcher.Skip, "./vfs", "./vfs/static.go")
+		config.Watcher.Skip = append(config.Watcher.Skip, "./vfs", "./vfs/vfs_static.go")
 
 		fmt.Printf("................Build............................\n")
 
@@ -370,6 +372,7 @@ var serveCommand = &cobra.Command{
 
 		dirpath := filepath.Join(pwd, config.Watcher.Dir)
 		binpath := filepath.Join(pwd, config.Bin)
+		vfspath := filepath.Join(pwd, config.VFS)
 
 		var readyforChange = false
 
@@ -391,6 +394,11 @@ var serveCommand = &cobra.Command{
 			}
 
 			if strings.Contains(ev.Name, binpath) {
+				// fmt.Printf("Skipping bin dir changes @ %s\n", ev.Name)
+				return
+			}
+
+			if strings.Contains(ev.Name, vfspath) {
 				// fmt.Printf("Skipping bin dir changes @ %s\n", ev.Name)
 				return
 			}

@@ -92,7 +92,7 @@ func LoadFiles(filesets []string, prefix, ignore string) ([]string, []string, ma
 }
 
 // BundleStatic generates a static file contain the set content to be bundle into a go file
-func BundleStatic(Outfile, Pkg, ignore, prefix string, fileSets []string, extras []*Vfile) error {
+func BundleStatic(Outfile, Pkg, ignore, prefix string, fileSets []string, extras []*Vfile, fx func() error) error {
 	if Outfile == "" {
 		panic("outfile name can not be empty")
 	}
@@ -180,6 +180,15 @@ func BundleStatic(Outfile, Pkg, ignore, prefix string, fileSets []string, extras
 
 		defer outwriter.Close()
 		io.Copy(outwriter, w)
+
+		if fx != nil {
+			return fx()
+		}
+		return nil
+	}
+
+	if fx != nil {
+		return fx()
 	}
 
 	return nil
