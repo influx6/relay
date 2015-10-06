@@ -16,9 +16,9 @@ Relay is a simple microframework with very simple designs that provide you with 
 # Usage
 
    - Command Example:
-    
-    
-                         
+
+
+
          ```bash
 
           # once installation is done using 'go get'
@@ -66,12 +66,28 @@ Relay is a simple microframework with very simple designs that provide you with 
               --> Creating project file: client/client.go
               --> Creating project file: client/app/app.go  
 
+
+              --->{{ProjectName}}
+                 |--->bin
+                 |--->client
+                   |---> app
+                   |---> client.go
+                 |--->controllers
+                   |--->controllers.go
+                 |--->templates
+                 |--->models
+                 |--->static
+                 |--->vfs
+                   |--->vfs.go
+                 |--->app.yaml
+                 |--->main.go
+
         ```
 
 
 
    - Where "app.yaml" contains =>
-    
+
 
       ```yaml
                 name: wonderbat
@@ -95,11 +111,11 @@ Relay is a simple microframework with very simple designs that provide you with 
                 # change this to fit appropriately if using a different scheme
                 package: github.com/influx6/wonderbat
 
-      ``` 
+      ```
 
 
    - where "main.go" contains =>
-    
+
 
       ```go
                 package main

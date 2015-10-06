@@ -441,7 +441,7 @@ func main() {
 
 	})
 
-	if err := server.Load("./app.yaml"); err != nil {
+	if err := server.Load("./app.yml"); err != nil {
 		panic(err)
 	}
 
@@ -481,6 +481,7 @@ var (
 		"client/app",
 		"controllers",
 		"models",
+		"shared",
 		"templates",
 		"static",
 		"vfs",
