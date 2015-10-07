@@ -124,7 +124,7 @@ func RunCMD(cmds []string, done func()) chan bool {
 					cmdo.Stdout = os.Stdout
 					cmdo.Stderr = os.Stderr
 
-					if err := cmdo.Run(); err != nil {
+					if err := cmdo.Start(); err != nil {
 						log.Printf("-> -> Error executing command: %s -> %s", cmd, err)
 					}
 				}

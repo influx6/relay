@@ -514,13 +514,13 @@ var serveCommand = &cobra.Command{
 					return true
 				}
 
-				if filepath.Ext(addPath) == ".js" {
-					return true
-				}
-
-				if filepath.Ext(addPath) == ".css" {
-					return true
-				}
+				// if filepath.Ext(addPath) == ".js" {
+				// 	return true
+				// }
+				//
+				// if filepath.Ext(addPath) == ".css" {
+				// 	return true
+				// }
 
 				if strings.Index(addPath, ".git") != -1 {
 					return false
