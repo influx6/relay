@@ -394,13 +394,13 @@ var serveCommand = &cobra.Command{
 		if len(config.Commands) > 0 {
 			hasCmds = true
 			cmdChan = RunCMD(config.Commands, func() {
+				fmt.Printf("=====================CMDS RUNNED========================================\n")
 				cmdwaiter.Done()
 			})
 
-			fmt.Printf("=====================COMMANDS INITD========================================\n")
+			// fmt.Printf("=====================COMMANDS INITD========================================\n")
 			cmdwaiter.Add(1)
 			cmdChan <- true
-			fmt.Printf("=====================CMD RUNNED========================================\n")
 		}
 
 		if config.GoMain {
@@ -478,11 +478,11 @@ var serveCommand = &cobra.Command{
 			{
 
 				if hasCmds {
-					fmt.Printf("=====================COMMANDS INITD========================================\n")
+					// fmt.Printf("=====================COMMANDS INITD========================================\n")
 					cmdwaiter.Add(1)
 					cmdChan <- true
 					cmdwaiter.Wait()
-					fmt.Printf("=====================CMD RUNNED========================================\n")
+					// fmt.Printf("=====================CMD RUNNED========================================\n")
 				}
 
 				waiter.Add(1)
