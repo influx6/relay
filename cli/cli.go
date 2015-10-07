@@ -514,9 +514,10 @@ var serveCommand = &cobra.Command{
 					return true
 				}
 
-				// if filepath.Ext(addPath) == ".js" {
-				// 	return true
-				// }
+				if filepath.Ext(addPath) == config.Static.TemplateExtension {
+					return true
+				}
+
 				//
 				// if filepath.Ext(addPath) == ".css" {
 				// 	return true

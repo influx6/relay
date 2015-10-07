@@ -28,7 +28,8 @@ var DefaultBuilder = BuildConfig{
 		Verbose:   "false",
 	},
 	Static: StaticConfig{
-		Dir: "./static",
+		Dir:               "./static",
+		TemplateExtension: ".tmpl",
 	},
 	Watcher: WatcherConfig{
 		Dir:      "./",
@@ -64,10 +65,11 @@ type JSConfig struct {
 
 // StaticConfig provides the configuration details for the static files location and arguments
 type StaticConfig struct {
-	Dir         string   `yaml:"dir"`
-	StripPrefix string   `yaml:"strip_prefix"`
-	Exclude     string   `yaml:"exclude"`
-	Extensions  []string `yaml:"exts"`
+	Dir               string   `yaml:"dir"`
+	StripPrefix       string   `yaml:"strip_prefix"`
+	Exclude           string   `yaml:"exclude"`
+	Extensions        []string `yaml:"exts"`
+	TemplateExtension string   `yaml:"template_ext"`
 }
 
 // BuildConfig provides the configuration details for the building constraints for using relay's builder
