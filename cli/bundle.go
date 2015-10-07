@@ -102,7 +102,7 @@ func LoadFiles(filesets []string, prefix, ignore string) ([]string, []string, ma
 }
 
 // BundleStatic generates a static file contain the set content to be bundle into a go file
-func BundleStatic(Outfile, Pkg, ignore, prefix string, fileSets []string, extras []*Vfile, fx func() error) error {
+func BundleStatic(Outfile, Pkg, ignore, prefix string, fileSets []string, extras []*Vfile, fx func() error, dev bool) error {
 	if Outfile == "" {
 		panic("outfile name can not be empty")
 	}
@@ -132,36 +132,45 @@ func BundleStatic(Outfile, Pkg, ignore, prefix string, fileSets []string, extras
 			dirs[b] = true
 		}
 
-		var buf bytes.Buffer
-		gw := gzip.NewWriter(&buf)
-
-		if _, err := gw.Write(f.data); err != nil {
-			return err
-		}
-
-		if err := gw.Close(); err != nil {
-			return err
-		}
-
 		t := f.fileinfo.ModTime().Unix()
+		if !dev {
+			var buf bytes.Buffer
+			gw := gzip.NewWriter(&buf)
 
-		fmt.Fprintf(w, fileform, fname, f.local, len(f.data), t, segment(&buf), "\n")
+			if _, err := gw.Write(f.data); err != nil {
+				return err
+			}
+
+			if err := gw.Close(); err != nil {
+				return err
+			}
+
+			fmt.Fprintf(w, fileform, fname, f.local, len(f.data), t, segment(&buf), "\n")
+		} else {
+			fmt.Fprintf(w, fileform, fname, f.local, 0, t, `"0"`, "\n")
+		}
 	}
 
 	//loadup the extra forms also
 	for _, vf := range extras {
-		var buf bytes.Buffer
-		gw := gzip.NewWriter(&buf)
+		if !dev {
+			var buf bytes.Buffer
+			gw := gzip.NewWriter(&buf)
 
-		if _, err := gw.Write(vf.Data()); err != nil {
-			return err
+			if _, err := gw.Write(vf.Data()); err != nil {
+				return err
+			}
+
+			if err := gw.Close(); err != nil {
+				return err
+			}
+
+			fmt.Fprintf(w, fileform, vf.Name(), vf.Path(), vf.ModTime().Unix(), segment(&buf), "\n")
+
+		} else {
+			fmt.Fprintf(w, fileform, vf.Name(), vf.Path(), vf.ModTime().Unix(), `"0"`, "\n")
 		}
 
-		if err := gw.Close(); err != nil {
-			return err
-		}
-
-		fmt.Fprintf(w, fileform, vf.Name(), vf.Path(), vf.ModTime().Unix(), segment(&buf), "\n")
 	}
 
 	for d := range dirs {

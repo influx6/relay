@@ -176,39 +176,7 @@ var createCommand = &cobra.Command{
 	},
 }
 
-var binBuilder = func(pwd string, config *BuildConfig) error {
-	pkg, err := build.Import(config.Package, "", 0)
-
-	if err != nil {
-		fmt.Printf("--> --> PkgBuild:Error: for %s -> %s with build.Import func \n", config.Package, err)
-		return err
-	}
-
-	_, binName := filepath.Split(pkg.ImportPath)
-
-	if config.Goget {
-		fmt.Printf("--> Running go get for %s\n", pkg.ImportPath)
-		_, err = GoDeps(pkg.ImportPath)
-
-		if err != nil {
-			fmt.Printf("--> --> go.get.Error: %s\n", err)
-			return err
-		}
-	}
-
-	fmt.Printf("--> Building binary file into %s\n", config.Bin)
-
-	_, err = Gobuild(config.Bin, binName)
-
-	if err != nil {
-		fmt.Printf("--> --> go.build.Error: %s\n", err)
-		return err
-	}
-
-	return nil
-}
-
-var assetsBuilder = func(pwd string, config *BuildConfig) error {
+var jsBuilder = func(pwd string, config *BuildConfig) error {
 	fmt.Printf("--> Building client code in %s as %s\n", config.Client.Dir, config.ClientPackage)
 
 	var verbose bool
@@ -256,6 +224,47 @@ var assetsBuilder = func(pwd string, config *BuildConfig) error {
 	// fmt.Fprint(jsmapfile, jsmap.Data())
 	jsmapfile.Close()
 
+	return nil
+}
+
+var binBuilder = func(pwd string, config *BuildConfig) error {
+	pkg, err := build.Import(config.Package, "", 0)
+
+	if err != nil {
+		fmt.Printf("--> --> PkgBuild:Error: for %s -> %s with build.Import func \n", config.Package, err)
+		return err
+	}
+
+	_, binName := filepath.Split(pkg.ImportPath)
+
+	if config.Goget {
+		fmt.Printf("--> Running go get for %s\n", pkg.ImportPath)
+		_, err = GoDeps(pkg.ImportPath)
+
+		if err != nil {
+			fmt.Printf("--> --> go.get.Error: %s\n", err)
+			return err
+		}
+	}
+
+	fmt.Printf("--> Building binary file into %s\n", config.Bin)
+
+	_, err = Gobuild(config.Bin, binName)
+
+	if err != nil {
+		fmt.Printf("--> --> go.build.Error: %s\n", err)
+		return err
+	}
+
+	return nil
+}
+
+var assetsBuilder = func(pwd string, config *BuildConfig) error {
+	if err := jsBuilder(pwd, config); err != nil {
+		return err
+	}
+
+	var err error
 	fmt.Printf("--> Building static files in %s to %s/vfs_static.go \n", config.Static.Dir, config.VFS)
 
 	virtualfile := filepath.Join(config.VFS, "vfs_static.go")
@@ -277,11 +286,12 @@ var assetsBuilder = func(pwd string, config *BuildConfig) error {
 	fmt.Printf("--> Using StripPrefix (%s) for all virtual paths \n", strip)
 
 	var done = make(chan bool)
+	// var dev = (config.Env == "dev" || strings.Contains(config.Env, "dev"))
 
 	err = BundleStatic(virtualfile, "vfs", config.Static.Exclude, pwd, virtualsets, nil, func() error {
 		close(done)
 		return nil
-	})
+	}, false)
 
 	if err != nil {
 		fmt.Printf("--> --> go.mkdir.vfs.static: for %s -> %s\n", virtualfile, err)
@@ -495,7 +505,8 @@ var serveCommand = &cobra.Command{
 				fmt.Printf("\n")
 
 				//execute assetBuilder to build assets alone
-				assetsBuilder(pwd, config)
+				// assetsBuilder(pwd, config)
+				jsBuilder(pwd, config)
 				fmt.Printf("=====================ASSETS REBUILT========================================\n")
 
 				waiter.Done()
@@ -569,7 +580,7 @@ var serveCommand = &cobra.Command{
 				fmt.Printf("\n")
 				fmt.Printf("\n")
 
-				waiter.Wait()
+				// waiter.Wait()
 
 				//execute binBuilder to build binary alone
 				err = binBuilder(pwd, config)
