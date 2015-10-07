@@ -420,6 +420,10 @@ var serveCommand = &cobra.Command{
 			Filter: func(addPath, basePath string) bool {
 				addPath = assets.EnsureSlash(addPath)
 
+				if strings.Index(addPath, ".git") != -1 {
+					return false
+				}
+
 				if strings.Index(addPath, ustrip) == -1 {
 					return false
 				}
@@ -482,6 +486,10 @@ var serveCommand = &cobra.Command{
 				stat, err := os.Stat(addPath)
 				if err == nil && stat.IsDir() {
 					return true
+				}
+
+				if strings.Index(addPath, ".git") != -1 {
+					return false
 				}
 
 				if !(filepath.Ext(addPath) == ".go") {
