@@ -18,7 +18,9 @@ var DefaultBuilder = BuildConfig{
 	Env:     "dev",
 	VFS:     "./vfs",
 	Bin:     "./bin",
+	Main:    "./main.go",
 	DoGoGet: "true",
+	UseMain: "false",
 	Client: JSConfig{
 		Dir:       "./client",
 		StaticDir: "static/js",
@@ -75,14 +77,19 @@ type BuildConfig struct {
 	Env           string        `yaml:"env"`
 	VFS           string        `yaml:"vfs"`
 	Bin           string        `yaml:"bin"`
+	Main          string        `yaml:"main"`
 	Package       string        `yaml:"package"`
 	BinArgs       []string      `yaml:"bin_args"`
 	Client        JSConfig      `yaml:"client"`
 	Static        StaticConfig  `yaml:"static"`
 	Watcher       WatcherConfig `yaml:"watcher"`
-	DoGoGet       string        `yaml:"doGoGet"`
 	ClientPackage string        `yaml:"-"`
 	Goget         bool          `yaml:"-"`
+	GoMain        bool          `yaml:"-"`
+	//dogoget ensures that after the first initial building that go get gets re-run on each rebuild
+	DoGoGet string `yaml:"dogoget"`
+	//useMain ensures to instead run the main file giving in 'main' instead of the built binary to reduce time
+	UseMain string `yaml:"usemain"`
 }
 
 // NewBuildConfig returns a new BuildConfig based off the defaults
@@ -114,6 +121,10 @@ func (c *BuildConfig) Load(file string) error {
 
 	if err := mergo.MergeWithOverwrite(c, conf); err != nil {
 		return err
+	}
+
+	if mano, err := strconv.ParseBool(c.UseMain); err == nil {
+		c.GoMain = mano
 	}
 
 	if doge, err := strconv.ParseBool(c.DoGoGet); err == nil {

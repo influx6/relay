@@ -207,29 +207,6 @@ var _escData = map[string]*_escFile{
 	footer = `}
 `
 
-	appYaml = `name: %s
-addr: %s
-env: dev
-
-hearbeat: %dm
-
-
-# output folder for go virtualfiles
-vfs: ./vfs
-
-# directory and settings for static code
-static:
-  dir: ./static
-
-# directory to locate client gopherjs code
-client:
-    dir: ./client
-
-# change this to fit appropriately if using a different scheme
-package: %s
-
-`
-
 	vsgofile = `package vfs
 
 import (
@@ -471,6 +448,33 @@ func main() {
 
 }
 
+`
+	appYaml = `name: %s
+addr: %s
+env: dev
+
+hearbeat: %dm
+
+
+# output folder for go virtualfiles
+vfs: ./vfs
+
+# directory and settings for static code
+static:
+  dir: ./static
+
+# directory to locate client gopherjs code
+client:
+    dir: ./client
+
+# change this to fit appropriately if using a different scheme
+package: %s
+
+# change as you see fit, this main file will be used if usemain is set to true
+main: ./main.go
+
+# enable this to use 'go run' instead of running the binary built on each rebuilding session
+usemain: false
 `
 )
 

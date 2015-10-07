@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/influx6/assets"
@@ -174,28 +175,40 @@ var createCommand = &cobra.Command{
 	},
 }
 
-var builder = func(config *BuildConfig) error {
-	pwd, _ := os.Getwd()
+var binBuilder = func(pwd string, config *BuildConfig) error {
 	pkg, err := build.Import(config.Package, "", 0)
 
 	if err != nil {
-		fmt.Printf("PkgBuild:Error: for %s -> %s with build.Import func \n", config.Package, err)
+		fmt.Printf("--> --> PkgBuild:Error: for %s -> %s with build.Import func \n", config.Package, err)
 		return err
 	}
 
 	_, binName := filepath.Split(pkg.ImportPath)
 
 	if config.Goget {
-		fmt.Printf("Running go get for %s\n", pkg.ImportPath)
+		fmt.Printf("--> Running go get for %s\n", pkg.ImportPath)
 		_, err = GoDeps(pkg.ImportPath)
 
 		if err != nil {
-			fmt.Printf("go.get.Error: %s\n", err)
+			fmt.Printf("--> --> go.get.Error: %s\n", err)
 			return err
 		}
 	}
 
-	fmt.Printf("Building client code in %s as %s\n", config.Client.Dir, config.ClientPackage)
+	fmt.Printf("--> Building binary file into %s\n", config.Bin)
+
+	_, err = Gobuild(config.Bin, binName)
+
+	if err != nil {
+		fmt.Printf("--> --> go.build.Error: %s\n", err)
+		return err
+	}
+
+	return nil
+}
+
+var assetsBuilder = func(pwd string, config *BuildConfig) error {
+	fmt.Printf("--> Building client code in %s as %s\n", config.Client.Dir, config.ClientPackage)
 
 	var verbose bool
 
@@ -208,11 +221,11 @@ var builder = func(config *BuildConfig) error {
 	js, jsmap, err := session.BuildPkg(config.ClientPackage, config.Client.Name)
 
 	if err != nil {
-		fmt.Printf("go.goperjs.build.Error: for %s -> %s\n", config.ClientPackage, err)
+		fmt.Printf("--> --> go.goperjs.build.Error: for %s -> %s\n", config.ClientPackage, err)
 		return err
 	}
 
-	fmt.Printf("Making static/js directory if not exisitng \n")
+	fmt.Printf("--> Making static/js directory if not exisitng \n")
 
 	jsdir := filepath.Join(pwd, config.Client.StaticDir)
 	_ = os.MkdirAll(jsdir, 0777)
@@ -223,7 +236,7 @@ var builder = func(config *BuildConfig) error {
 	jsfile, err := os.Create(jsfilepath)
 
 	if err != nil {
-		fmt.Printf("go.mkdir.js.file: for %s -> %s\n", jsfilepath, err)
+		fmt.Printf("--> --> go.mkdir.js.file: for %s -> %s\n", jsfilepath, err)
 		return err
 	}
 
@@ -234,7 +247,7 @@ var builder = func(config *BuildConfig) error {
 	jsmapfile, err := os.Create(jsmapfilepath)
 
 	if err != nil {
-		fmt.Printf("go.mkdir.js.file: for %s -> %s\n", jsfilepath, err)
+		fmt.Printf("--> --> go.mkdir.js.file: for %s -> %s\n", jsfilepath, err)
 		return err
 	}
 
@@ -242,7 +255,7 @@ var builder = func(config *BuildConfig) error {
 	// fmt.Fprint(jsmapfile, jsmap.Data())
 	jsmapfile.Close()
 
-	fmt.Printf("Building static files in %s to %s/vfs_static.go \n", config.Static.Dir, config.VFS)
+	fmt.Printf("--> Building static files in %s to %s/vfs_static.go \n", config.Static.Dir, config.VFS)
 
 	virtualfile := filepath.Join(config.VFS, "vfs_static.go")
 
@@ -260,7 +273,7 @@ var builder = func(config *BuildConfig) error {
 		strip = pwd
 	}
 
-	fmt.Printf("Using StripPrefix (%s) for all virtual paths \n", strip)
+	fmt.Printf("--> Using StripPrefix (%s) for all virtual paths \n", strip)
 
 	var done = make(chan bool)
 
@@ -270,18 +283,24 @@ var builder = func(config *BuildConfig) error {
 	})
 
 	if err != nil {
-		fmt.Printf("go.mkdir.vfs.static: for %s -> %s\n", virtualfile, err)
+		fmt.Printf("--> --> go.mkdir.vfs.static: for %s -> %s\n", virtualfile, err)
 		return err
 	}
 
 	<-done
+	return nil
+}
 
-	fmt.Printf("Building binary file into %s\n", config.Bin)
+var builder = func(config *BuildConfig) error {
+	pwd, _ := os.Getwd()
 
-	_, err = Gobuild(config.Bin, binName)
+	if err := assetsBuilder(pwd, config); err != nil {
+		fmt.Printf("--> --> cmd.assetBuilder.Error: for %s -> %s\n", config.ClientPackage, err)
+		return err
+	}
 
-	if err != nil {
-		fmt.Printf("go.build.Error: %s\n", err)
+	if err := binBuilder(pwd, config); err != nil {
+		fmt.Printf("--> --> cmd.binBuilder.Error: for %s -> %s\n", config.ClientPackage, err)
 		return err
 	}
 
@@ -325,76 +344,160 @@ var serveCommand = &cobra.Command{
 	Short: "serves up the project and watches for changes",
 	Long:  `it will rebuild and bundle your project files with build and reserve them on any change`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var err error
-		var wa *assets.Watcher
-
 		pwd, _ := os.Getwd()
 
-		fmt.Printf("Searching for 'app.yaml' file in (%s)....\n", pwd)
+		fmt.Printf("--> Searching for 'app.yaml' file in (%s)....\n", pwd)
 
 		//get the app.file
 		appfile := filepath.Join(pwd, "./app.yml")
 
 		if _, err := os.Stat(appfile); err != nil {
-			fmt.Printf("Error: 'app.yml' not found in (%s)....\n", pwd)
+			fmt.Printf("--> --> Error: 'app.yml' not found in (%s)....\n", pwd)
 			return
 		}
 
 		var config = NewBuildConfig()
+		var ustrip = assets.EnsureSlash(filepath.Join(pwd, config.Static.StripPrefix))
+		var ccop = assets.EnsureSlash(filepath.Join(pwd, config.Client.Dir))
+		var acop = assets.EnsureSlash(filepath.Join(pwd, config.Static.Dir))
+		var tcop = assets.EnsureSlash(filepath.Join(pwd, "templates"))
+		var mainfile = assets.EnsureSlash(filepath.Join(pwd, config.Main))
 
-		fmt.Printf("Found app.yml and loading into config...\n")
+		fmt.Printf("--> Found app.yml and loading into config...\n")
 
 		if err := config.Load(appfile); err != nil {
-			fmt.Printf("ConfigError: 'app.yaml' -> %s\n", err)
+			fmt.Printf("--> --> ConfigError: 'app.yaml' -> %s\n", err)
 			return
 		}
 
 		config.Watcher.Skip = append(config.Watcher.Skip, "./vfs", "./vfs/vfs_static.go")
 
-		fmt.Printf("................Build............................\n")
-
 		//lets build the files
-		err = builder(config)
-
-		if err != nil {
-			fmt.Printf("PkgBuild:Error: for %s -> %s with build.Import func \n", config.Package, err)
+		if err := builder(config); err != nil {
 			return
 		}
+		fmt.Printf("\n")
+		fmt.Printf("\n")
 
 		_, binName := filepath.Split(config.Package)
 		bin := filepath.Join(pwd, config.Bin)
 
-		fmt.Printf("Initializing binary from %s with name %s\n", bin, binName)
+		fmt.Printf("--> Initializing binary from %s with name %s\n", bin, binName)
 
-		fmt.Printf("Running binary file: %s\n", filepath.Join(bin, binName))
-		runChan := RunBin(bin, binName, config.BinArgs, nil)
+		//initalize it so we dont run into a blocked channel
+		var runChan chan bool
 
-		fmt.Printf("Sending Run Signal to GoChan <- true \n")
+		if config.GoMain {
+			fmt.Printf("--> Running Mainfile file: %s\n", mainfile)
+			runChan = RunGo(mainfile, config.BinArgs, nil)
+		} else {
+			fmt.Printf("--> Running binary file: %s\n", filepath.Join(bin, binName))
+			runChan = RunBin(bin, binName, config.BinArgs, nil)
+		}
+
+		fmt.Printf("--> Sending Run Signal to GoChan <- true \n")
 		runChan <- true
 
 		config.Watcher.Pkgs = append(config.Watcher.Pkgs, config.Package, "github.com/influx6/relay/relay", "github.com/influx6/relay/engine")
-		fmt.Printf("Generating assets for : %s -> Packages: %+s\n", config.Watcher.Dir, config.Watcher.Pkgs)
+
+		fmt.Printf("--> Registering Packages for watching in -> (%s) \n", config.Watcher.Dir)
 
 		dirpath := filepath.Join(pwd, config.Watcher.Dir)
 		binpath := filepath.Join(pwd, config.Bin)
 		vfspath := filepath.Join(pwd, config.VFS)
 
-		var readyforChange = false
+		var waiter sync.WaitGroup
+		var waiting bool
+		var binwaiting bool
 
-		wa, err = assets.NewWatch(assets.WatcherConfig{
+		//this watch will watch only for assets and static file changes including js changes
+		assetsWatcher, err := assets.NewWatch(assets.WatcherConfig{
 			Dir:      dirpath,
 			Ext:      config.Watcher.Ext,
 			Skip:     config.Watcher.Skip,
 			MaxRetry: config.Watcher.MaxRetry,
 			ExtraPkg: config.Watcher.Pkgs,
-		}, func(err error, ev *fsnotify.Event, wo *assets.Watcher) {
+			Filter: func(addPath, basePath string) bool {
+				addPath = assets.EnsureSlash(addPath)
 
-			//if its an error stop
+				if strings.Index(addPath, ustrip) == -1 {
+					return false
+				}
+
+				if strings.Index(addPath, ccop) != -1 {
+					return true
+				}
+
+				if strings.Index(addPath, acop) != -1 {
+					return true
+				}
+
+				if strings.Index(addPath, tcop) != -1 {
+					return true
+				}
+
+				// ext := filepath.Ext(addPath)
+				// if ext == ".go" {
+				// }
+
+				return false
+			},
+		}, func(err error, ev *fsnotify.Event, wo *assets.Watcher) {
+			//if its an error dont act
 			if err != nil {
 				return
 			}
 
-			if !readyforChange {
+			//if we are alredy waiting just ignore this, use this instead of calling waiter.Wait()
+			// because that means we will do double compile, better
+			// TODO: is double compile when done after one another good?
+			if waiting {
+				return
+			}
+
+			fmt.Printf("=====================ASSETS========================================\n")
+			fmt.Printf("File change at ->: %s, Commencing Asset Recompilation\n", ev.Name)
+			fmt.Printf("=====================ASSETS========================================\n")
+			fmt.Printf("\n")
+			fmt.Printf("\n")
+
+			waiting = true
+			waiter.Add(1)
+			//execute assetBuilder to build assets alone
+			assetsBuilder(pwd, config)
+			fmt.Printf("=====================ASSETS REBUILT========================================\n")
+
+			waiter.Done()
+			waiting = false
+		})
+
+		binWatcher, err := assets.NewWatch(assets.WatcherConfig{
+			Dir:      dirpath,
+			Ext:      config.Watcher.Ext,
+			Skip:     config.Watcher.Skip,
+			MaxRetry: config.Watcher.MaxRetry,
+			ExtraPkg: config.Watcher.Pkgs,
+			Filter: func(addPath, basePath string) bool {
+				addPath = assets.EnsureSlash(addPath)
+				stat, err := os.Stat(addPath)
+				if err == nil && stat.IsDir() {
+					return true
+				}
+
+				if !(filepath.Ext(addPath) == ".go") {
+					return false
+				}
+
+				return true
+			},
+		}, func(err error, ev *fsnotify.Event, wo *assets.Watcher) {
+
+			//if its an error dont act
+			if err != nil {
+				return
+			}
+
+			if binwaiting {
 				return
 			}
 
@@ -408,20 +511,26 @@ var serveCommand = &cobra.Command{
 				return
 			}
 
-			readyforChange = false
-			fmt.Printf("File change at ->: %s, Commencing Recompilation\n", ev.Name)
+			// readyforChange = false
+			fmt.Printf("=====================GO-CODE========================================\n")
+			fmt.Printf("File change at ->: %s, Commencing Binary Recompilation\n", ev.Name)
+			fmt.Printf("=====================GO-CODE========================================\n")
+			fmt.Printf("\n")
+			fmt.Printf("\n")
 
-			fmt.Printf("\n.............Build: COMPILING CHANGE...............................\n\n")
-			//execute build command
-			err = builder(config)
+			binwaiting = true
+			waiter.Wait()
+
+			//execute binBuilder to build binary alone
+			err = binBuilder(pwd, config)
+			fmt.Printf("=====================BINARY REBUILT========================================\n")
 
 			//goroutine and relunch and restart watcher
 			go func() {
 				runChan <- true
-				fmt.Printf("............................................\n\n")
-				readyforChange = true
 				wo.Start()
 			}()
+			binwaiting = false
 
 		})
 
@@ -430,9 +539,11 @@ var serveCommand = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("............................................\n\n")
-		go wa.Start()
-		readyforChange = true
+		fmt.Printf("------------------------------------done----------------------\n")
+		// fmt.Printf("\n")
+
+		go assetsWatcher.Start()
+		go binWatcher.Start()
 
 		config.Goget = false
 
@@ -445,8 +556,9 @@ var serveCommand = &cobra.Command{
 		for {
 			select {
 			case <-ch:
-				fmt.Printf("Received Kill Signal, will stop watcher and app\n")
-				wa.Stop()
+				fmt.Printf("Received Kill Signal, will stop watcher and application\n")
+				assetsWatcher.Stop()
+				binWatcher.Stop()
 				close(runChan)
 				return
 			}

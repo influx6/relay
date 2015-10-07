@@ -88,6 +88,53 @@ func Gobuild(dir, name string) (bool, error) {
 	return true, nil
 }
 
+// RunGo runs the generated binary file with the arguments expected
+func RunGo(gofile string, args []string, stop func()) chan bool {
+	var relunch = make(chan bool)
+
+	// if runtime.GOOS == "windows" {
+	gofile = filepath.Clean(gofile)
+	// }
+
+	go func() {
+
+		// var cmdline = fmt.Sprintf("go run %s", gofile)
+		cmdargs := append([]string{"run", gofile}, args...)
+		// cmdline = strings.Joinappend([]string{}, "go run", gofile)
+
+		var proc *os.Process
+
+		for dosig := range relunch {
+			if proc != nil {
+				if err := proc.Signal(os.Interrupt); err != nil {
+					log.Printf("Error in Sending Kill Signal %s", err)
+					proc.Kill()
+				}
+				proc.Wait()
+			}
+
+			if !dosig {
+				continue
+			}
+
+			cmd := exec.Command("go", cmdargs...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+
+			if err := cmd.Start(); err != nil {
+				log.Printf("Error starting process: %s", err)
+			}
+
+			proc = cmd.Process
+		}
+
+		if stop != nil {
+			stop()
+		}
+	}()
+	return relunch
+}
+
 // RunBin runs the generated binary file with the arguments expected
 func RunBin(bindir, bin string, args []string, stop func()) chan bool {
 	var relunch = make(chan bool)
