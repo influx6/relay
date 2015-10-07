@@ -86,6 +86,8 @@ type BuildConfig struct {
 	ClientPackage string        `yaml:"-"`
 	Goget         bool          `yaml:"-"`
 	GoMain        bool          `yaml:"-"`
+	//Commands will be executed before any building of assets or compiling of binary
+	Commands []string `yaml:"commands"`
 	//dogoget ensures that after the first initial building that go get gets re-run on each rebuild
 	DoGoGet string `yaml:"dogoget"`
 	//useMain ensures to instead run the main file giving in 'main' instead of the built binary to reduce time

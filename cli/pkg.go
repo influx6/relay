@@ -88,6 +88,57 @@ func Gobuild(dir, name string) (bool, error) {
 	return true, nil
 }
 
+// RunCMD runs the a set of commands from a list while skipping any one-length command
+func RunCMD(cmds []string, done func()) chan bool {
+	if len(cmds) < 0 {
+		panic("commands list cant be empty")
+	}
+
+	var relunch = make(chan bool)
+
+	go func() {
+
+	cmdloop:
+		for {
+			select {
+			case do, ok := <-relunch:
+
+				if !ok {
+					break cmdloop
+				}
+
+				if !do {
+					continue
+				}
+
+				for _, cox := range cmds {
+
+					cmd := strings.Split(cox, " ")
+
+					if len(cmd) <= 1 {
+						continue
+					}
+
+					fmt.Printf("-> Executing Command: %s\n", cmd)
+					cmdo := exec.Command(cmd[0], cmd[1:]...)
+					cmdo.Stdout = os.Stdout
+					cmdo.Stderr = os.Stderr
+
+					if err := cmdo.Run(); err != nil {
+						log.Printf("-> -> Error executing command: %s -> %s", cmd, err)
+					}
+				}
+
+				if done != nil {
+					done()
+				}
+			}
+		}
+
+	}()
+	return relunch
+}
+
 // RunGo runs the generated binary file with the arguments expected
 func RunGo(gofile string, args []string, stop func()) chan bool {
 	var relunch = make(chan bool)

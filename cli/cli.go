@@ -383,8 +383,25 @@ var serveCommand = &cobra.Command{
 
 		fmt.Printf("--> Initializing binary from %s with name %s\n", bin, binName)
 
+		var waiter sync.WaitGroup
+		var cmdwaiter sync.WaitGroup
+		var hasCmds bool
+
 		//initalize it so we dont run into a blocked channel
-		var runChan chan bool
+		var runChan chan bool = make(chan bool)
+		var cmdChan chan bool = make(chan bool)
+
+		if len(config.Commands) > 0 {
+			hasCmds = true
+			cmdChan = RunCMD(config.Commands, func() {
+				cmdwaiter.Done()
+			})
+
+			fmt.Printf("=====================COMMANDS INITD========================================\n")
+			cmdwaiter.Add(1)
+			cmdChan <- true
+			fmt.Printf("=====================CMD RUNNED========================================\n")
+		}
 
 		if config.GoMain {
 			fmt.Printf("--> Running Mainfile file: %s\n", mainfile)
@@ -404,8 +421,6 @@ var serveCommand = &cobra.Command{
 		dirpath := filepath.Join(pwd, config.Watcher.Dir)
 		binpath := filepath.Join(pwd, config.Bin)
 		vfspath := filepath.Join(pwd, config.VFS)
-
-		var waiter sync.WaitGroup
 
 		var waiting int64
 		var binwaiting int64
@@ -461,6 +476,14 @@ var serveCommand = &cobra.Command{
 
 			atomic.StoreInt64(&waiting, 1)
 			{
+
+				if hasCmds {
+					fmt.Printf("=====================COMMANDS INITD========================================\n")
+					cmdwaiter.Add(1)
+					cmdChan <- true
+					cmdwaiter.Wait()
+					fmt.Printf("=====================CMD RUNNED========================================\n")
+				}
 
 				waiter.Add(1)
 				fmt.Printf("=====================ASSETS========================================\n")
@@ -545,7 +568,6 @@ var serveCommand = &cobra.Command{
 
 			}
 			atomic.StoreInt64(&binwaiting, 0)
-
 		})
 
 		if err != nil {
@@ -574,6 +596,7 @@ var serveCommand = &cobra.Command{
 				assetsWatcher.Stop()
 				binWatcher.Stop()
 				close(runChan)
+				close(cmdChan)
 				return
 			}
 		}
