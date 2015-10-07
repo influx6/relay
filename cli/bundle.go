@@ -50,9 +50,15 @@ func LoadFiles(filesets []string, prefix, ignore string) ([]string, []string, ma
 		for len(files) > 0 {
 			fname := files[0]
 			files = files[1:]
+
+			if strings.Index(fname, ".git") != -1 {
+				continue
+			}
+
 			if ignoreRegexp != nil && ignoreRegexp.MatchString(fname) {
 				continue
 			}
+
 			f, err := os.Open(fname)
 			if err != nil {
 				return nil, nil, nil, err
@@ -67,6 +73,10 @@ func LoadFiles(filesets []string, prefix, ignore string) ([]string, []string, ma
 					return nil, nil, nil, err
 				}
 				for _, fi := range fis {
+					if strings.Index(fi.Name(), ".git") != -1 {
+						continue
+					}
+
 					files = append(files, filepath.Join(fname, fi.Name()))
 				}
 			} else {

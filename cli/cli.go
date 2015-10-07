@@ -372,12 +372,10 @@ var serveCommand = &cobra.Command{
 
 		config.Watcher.Skip = append(config.Watcher.Skip, "./vfs", "./vfs/vfs_static.go")
 
-		//lets build the files
+		// lets build the files
 		if err := builder(config); err != nil {
 			return
 		}
-		fmt.Printf("\n")
-		fmt.Printf("\n")
 
 		_, binName := filepath.Split(config.Package)
 		bin := filepath.Join(pwd, config.Bin)
@@ -547,7 +545,7 @@ var serveCommand = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("------------------------------------done----------------------\n")
+		// fmt.Printf("------------------------------------done----------------------\n")
 		// fmt.Printf("\n")
 
 		go assetsWatcher.Start()
