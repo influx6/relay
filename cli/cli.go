@@ -424,9 +424,11 @@ var serveCommand = &cobra.Command{
 
 		var waiting int64
 		var binwaiting int64
+		var assetsWatcher, binWatcher *assets.Watcher
+		var err error
 
 		//this watch will watch only for assets and static file changes including js changes
-		assetsWatcher, err := assets.NewWatch(assets.WatcherConfig{
+		assetsWatcher, err = assets.NewWatch(assets.WatcherConfig{
 			Dir:      dirpath,
 			Ext:      config.Watcher.Ext,
 			Skip:     config.Watcher.Skip,
@@ -499,9 +501,13 @@ var serveCommand = &cobra.Command{
 				waiter.Done()
 			}
 			atomic.StoreInt64(&waiting, 0)
+
+			if binWatcher != nil {
+				binWatcher.ForceNotify()
+			}
 		})
 
-		binWatcher, err := assets.NewWatch(assets.WatcherConfig{
+		binWatcher, err = assets.NewWatch(assets.WatcherConfig{
 			Dir:      dirpath,
 			Ext:      config.Watcher.Ext,
 			Skip:     config.Watcher.Skip,
