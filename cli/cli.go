@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/influx6/assets"
@@ -405,8 +406,9 @@ var serveCommand = &cobra.Command{
 		vfspath := filepath.Join(pwd, config.VFS)
 
 		var waiter sync.WaitGroup
-		var waiting bool
-		var binwaiting bool
+
+		var waiting int64
+		var binwaiting int64
 
 		//this watch will watch only for assets and static file changes including js changes
 		assetsWatcher, err := assets.NewWatch(assets.WatcherConfig{
@@ -453,24 +455,27 @@ var serveCommand = &cobra.Command{
 			//if we are alredy waiting just ignore this, use this instead of calling waiter.Wait()
 			// because that means we will do double compile, better
 			// TODO: is double compile when done after one another good?
-			if waiting {
+			if atomic.LoadInt64(&waiting) > 0 {
 				return
 			}
 
-			fmt.Printf("=====================ASSETS========================================\n")
-			fmt.Printf("File change at ->: %s, Commencing Asset Recompilation\n", ev.Name)
-			fmt.Printf("=====================ASSETS========================================\n")
-			fmt.Printf("\n")
-			fmt.Printf("\n")
+			atomic.StoreInt64(&waiting, 1)
+			{
 
-			waiting = true
-			waiter.Add(1)
-			//execute assetBuilder to build assets alone
-			assetsBuilder(pwd, config)
-			fmt.Printf("=====================ASSETS REBUILT========================================\n")
+				waiter.Add(1)
+				fmt.Printf("=====================ASSETS========================================\n")
+				fmt.Printf("File change at ->: %s, Commencing Asset Recompilation\n", ev.Name)
+				fmt.Printf("=====================ASSETS========================================\n")
+				fmt.Printf("\n")
+				fmt.Printf("\n")
 
-			waiter.Done()
-			waiting = false
+				//execute assetBuilder to build assets alone
+				assetsBuilder(pwd, config)
+				fmt.Printf("=====================ASSETS REBUILT========================================\n")
+
+				waiter.Done()
+			}
+			atomic.StoreInt64(&waiting, 0)
 		})
 
 		binWatcher, err := assets.NewWatch(assets.WatcherConfig{
@@ -503,7 +508,7 @@ var serveCommand = &cobra.Command{
 				return
 			}
 
-			if binwaiting {
+			if atomic.LoadInt64(&binwaiting) > 0 {
 				return
 			}
 
@@ -517,26 +522,29 @@ var serveCommand = &cobra.Command{
 				return
 			}
 
-			// readyforChange = false
-			fmt.Printf("=====================GO-CODE========================================\n")
-			fmt.Printf("File change at ->: %s, Commencing Binary Recompilation\n", ev.Name)
-			fmt.Printf("=====================GO-CODE========================================\n")
-			fmt.Printf("\n")
-			fmt.Printf("\n")
+			atomic.StoreInt64(&binwaiting, 1)
+			{
+				// readyforChange = false
+				fmt.Printf("=====================GO-CODE========================================\n")
+				fmt.Printf("File change at ->: %s, Commencing Binary Recompilation\n", ev.Name)
+				fmt.Printf("=====================GO-CODE========================================\n")
+				fmt.Printf("\n")
+				fmt.Printf("\n")
 
-			binwaiting = true
-			waiter.Wait()
+				waiter.Wait()
 
-			//execute binBuilder to build binary alone
-			err = binBuilder(pwd, config)
-			fmt.Printf("=====================BINARY REBUILT========================================\n")
+				//execute binBuilder to build binary alone
+				err = binBuilder(pwd, config)
+				fmt.Printf("=====================BINARY REBUILT========================================\n")
 
-			//goroutine and relunch and restart watcher
-			go func() {
-				runChan <- true
-				wo.Start()
-			}()
-			binwaiting = false
+				//goroutine and relunch and restart watcher
+				go func() {
+					runChan <- true
+					wo.Start()
+				}()
+
+			}
+			atomic.StoreInt64(&binwaiting, 0)
 
 		})
 
