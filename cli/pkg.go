@@ -16,6 +16,12 @@ var multispaces = regexp.MustCompile(`\s+`)
 
 // GoDeps calls go get for specific package
 func GoDeps(targetdir string) (bool, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("godeps.Error: %+s", err)
+		}
+	}()
+
 	cmdline := []string{"go", "get"}
 
 	cmdline = append(cmdline, targetdir)
@@ -37,6 +43,11 @@ func GoDeps(targetdir string) (bool, error) {
 
 // GoRun runs the runs a command
 func GoRun(cmd string) string {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("gorun.Error: %+s", err)
+		}
+	}()
 	var cmdline []string
 	com := strings.Split(cmd, " ")
 
@@ -64,6 +75,12 @@ func GoRun(cmd string) string {
 
 // Gobuild runs the build process and returns true/false and an error
 func Gobuild(dir, name string) (bool, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("gobuild.Error: %+s", err)
+		}
+	}()
+
 	cmdline := []string{"go", "build"}
 
 	if runtime.GOOS == "windows" {
@@ -76,14 +93,14 @@ func Gobuild(dir, name string) (bool, error) {
 	//setup the executor and use a shard buffer
 	cmd := exec.Command("go", cmdline[1:]...)
 	buf := bytes.NewBuffer([]byte{})
-	cmd.Stdout = buf
-	cmd.Stderr = buf
 
-	err := cmd.Run()
+	msg, err := cmd.CombinedOutput()
 
-	if buf.Len() > 0 {
-		return false, fmt.Errorf("go build failed: %s: %s", buf.String(), err.Error())
+	if !cmd.ProcessState.Success() {
+		return false, fmt.Errorf("go.build failed: %s: %s", buf.String(), err.Error())
 	}
+
+	log.Printf("go.build sucessfully -> %s", msg)
 
 	return true, nil
 }
@@ -97,6 +114,11 @@ func RunCMD(cmds []string, done func()) chan bool {
 	var relunch = make(chan bool)
 
 	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("cmdRun.Error: %+s", err)
+			}
+		}()
 
 	cmdloop:
 		for {
@@ -157,7 +179,15 @@ func RunGo(gofile string, args []string, stop func()) chan bool {
 
 		for dosig := range relunch {
 			if proc != nil {
-				if err := proc.Signal(os.Interrupt); err != nil {
+				var err error
+
+				if runtime.GOOS == "windows" {
+					err = proc.Kill()
+				} else {
+					err = proc.Signal(os.Interrupt)
+				}
+
+				if err != nil {
 					log.Printf("Error in Sending Kill Signal %s", err)
 					proc.Kill()
 				}
@@ -196,7 +226,15 @@ func RunBin(bindir, bin string, args []string, stop func()) chan bool {
 
 		for dosig := range relunch {
 			if proc != nil {
-				if err := proc.Signal(os.Interrupt); err != nil {
+				var err error
+
+				if runtime.GOOS == "windows" {
+					err = proc.Kill()
+				} else {
+					err = proc.Signal(os.Interrupt)
+				}
+
+				if err != nil {
 					log.Printf("Error in Sending Kill Signal %s", err)
 					proc.Kill()
 				}
