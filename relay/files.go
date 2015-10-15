@@ -2,6 +2,7 @@ package relay
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	filepath "path/filepath"
 )
@@ -17,6 +18,8 @@ func ServeFile(indexFile, dir, file string, res http.ResponseWriter, req *http.R
 		return NewCustomError("http.ServeFile.Status", fmt.Sprintf("%d", http.StatusNotFound))
 	}
 
+	ext := filepath.Ext(file)
+
 	fi, _ := f.Stat()
 	if fi.IsDir() {
 		file = filepath.Join(file, indexFile)
@@ -27,6 +30,10 @@ func ServeFile(indexFile, dir, file string, res http.ResponseWriter, req *http.R
 		fi, _ = f.Stat()
 	}
 
+	// cext := mime.TypeByExtension(ext)
+	// if cext != "" {
+	res.Header().Add("Content-Type", mime.TypeByExtension(ext))
+	// }
 	http.ServeContent(res, req, fi.Name(), fi.ModTime(), f)
 	return nil
 }

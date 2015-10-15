@@ -18,7 +18,7 @@ type RHandler func(http.ResponseWriter, *http.Request, Collector)
 //WrapRouteHandlerFunc wraps http handler into a router RHandler
 func WrapRouteHandlerFunc(r http.HandlerFunc) RHandler {
 	return func(res http.ResponseWriter, req *http.Request, _ Collector) {
-		http.Redirect(res, req, "/404", 200)
+		http.Redirect(res, req, "/404", 302)
 	}
 }
 
@@ -265,7 +265,7 @@ func (r *Routes) ReRender(method, from, to string) {
 
 // Redirect sets the request to be redirected to another path
 func (r *Routes) Redirect(to string, res http.ResponseWriter, req *http.Request, c Collector) {
-	http.Redirect(res, req, to, 200)
+	http.Redirect(res, req, to, 302)
 }
 
 // Render sets the request to be handle by another path
