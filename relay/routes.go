@@ -276,6 +276,7 @@ func (r *Routes) Render(to string, res http.ResponseWriter, req *http.Request, c
 
 // ServeDir serves up a directory to the request
 func (r *Routes) ServeDir(pattern, dir, strip string) {
+	pattern = strings.TrimSuffix(strings.TrimSuffix(pattern, "/*"), "/")
 	r.Add("get head", pattern+"/*", func(res http.ResponseWriter, req *http.Request, c Collector) {
 		requested := reggy.CleanPath(req.URL.Path)
 		file := strings.TrimPrefix(requested, strip)

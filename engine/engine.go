@@ -27,7 +27,7 @@ var DefaultConfig = Config{
 	Static:    StaticConfig{Dir: "./static"},
 	Heartbeat: "5m",
 	Killbeat:  "2m",
-	Templates: assets.TemplateConfig{
+	TemplatesConfig: assets.TemplateConfig{
 		Dir:       "./templates",
 		Extension: ".tmpl",
 	},
@@ -90,12 +90,12 @@ type Config struct {
 	Env       string `yaml:"env"`
 	Heartbeat string `yaml:"heartbeat"`
 	//the timeout for graceful shutdown of server
-	Killbeat     string                `yaml:"killbeat"`
-	C            TLSConfig             `yaml:"tls"`
-	Static       StaticConfig          `yaml:"static"`
-	Db           Db                    `yaml:"db"`
-	Templates    assets.TemplateConfig `yaml:"templates"`
-	IsProduction bool                  `yaml:"-"`
+	Killbeat        string                `yaml:"killbeat"`
+	C               TLSConfig             `yaml:"tls"`
+	Static          StaticConfig          `yaml:"static"`
+	Db              Db                    `yaml:"db"`
+	TemplatesConfig assets.TemplateConfig `yaml:"templates"`
+	IsProduction    bool                  `yaml:"-"`
 }
 
 // NewConfig returns a new configuration file
@@ -156,10 +156,10 @@ type Engine struct {
 //NewEngine returns a new app configuration
 func NewEngine(c *Config, init func(*Engine)) *Engine {
 	eo := &Engine{
-		Config: c,
-		Routes: relay.NewRoutes(""),
-		// Template: assets.NewTemplateDir(&c.Templates),
-		OnInit: init,
+		Config:   c,
+		Routes:   relay.NewRoutes(""),
+		Template: assets.NewTemplateDir(&c.TemplatesConfig),
+		OnInit:   init,
 	}
 
 	eo.stop = makeDuration(c.Killbeat, 20)
