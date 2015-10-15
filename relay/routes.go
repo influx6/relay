@@ -18,7 +18,7 @@ type RHandler func(http.ResponseWriter, *http.Request, Collector)
 //WrapRouteHandlerFunc wraps http handler into a router RHandler
 func WrapRouteHandlerFunc(r http.HandlerFunc) RHandler {
 	return func(res http.ResponseWriter, req *http.Request, _ Collector) {
-		r(res, req)
+		http.Redirect(res, req, "/404", 200)
 	}
 }
 
@@ -84,10 +84,12 @@ func NewRoutes(ns string) *Routes {
 
 //BuildRoutes returns a new Routes instance
 func BuildRoutes(ns string, failed http.HandlerFunc, panic PanicHandler) *Routes {
-	// if ns != "/" {
-	// 	ns = reggy.TrimSlashes(ns)
-	// }
-	//
+	if failed == nil {
+		failed = func(res http.ResponseWriter, req *http.Request) {
+
+		}
+	}
+
 	rs := Routes{
 		namespace:    ns,
 		routes:       make(map[string]*Route),
@@ -277,6 +279,7 @@ func (r *Routes) Render(to string, res http.ResponseWriter, req *http.Request, c
 // ServeDir serves up a directory to the request
 func (r *Routes) ServeDir(pattern, dir, strip string) {
 	pattern = strings.TrimSuffix(strings.TrimSuffix(pattern, "/*"), "/")
+	strip = path.Clean(fmt.Sprintf("/%s/", strip))
 	r.Add("get head", pattern+"/*", func(res http.ResponseWriter, req *http.Request, c Collector) {
 		requested := reggy.CleanPath(req.URL.Path)
 		file := strings.TrimPrefix(requested, strip)
@@ -302,7 +305,6 @@ func (r *Routes) ServeDirIndex(pattern, indexFile, dir, strip string) {
 //ServeFile adds a only route for handling file requests
 func (r *Routes) ServeFile(pattern, file string) {
 	r.Add("get head", pattern, func(res http.ResponseWriter, req *http.Request, c Collector) {
-
 		dir, file := path.Split(file)
 		if err := ServeFile("", dir, file, res, req); err != nil {
 			r.doFail(res, req, c)

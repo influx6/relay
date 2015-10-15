@@ -10,6 +10,9 @@ import (
 func ServeFile(indexFile, dir, file string, res http.ResponseWriter, req *http.Request) error {
 	fs := http.Dir(dir)
 	f, err := fs.Open(file)
+
+	// log.Printf("opening file from %s for %s -> %s", dir, file, err)
+
 	if err != nil {
 		return NewCustomError("http.ServeFile.Status", fmt.Sprintf("%d", http.StatusNotFound))
 	}

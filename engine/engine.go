@@ -24,7 +24,7 @@ import (
 var DefaultConfig = Config{
 	Addr:      ":8080",
 	Env:       "dev",
-	Static:    StaticConfig{Dir: "./static"},
+	Static:    StaticConfig{Dir: "./static", StripPrefix: "static"},
 	Heartbeat: "5m",
 	Killbeat:  "2m",
 	TemplatesConfig: assets.TemplateConfig{
