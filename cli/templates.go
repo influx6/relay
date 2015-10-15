@@ -224,7 +224,6 @@ var _escData = map[string]*_escFile{
 import (
 	//remove the _ when ready to use
 	_ "{{controllerpkg}}"
-	"{{staticpkg}}"
 
 	"net/http"
 	"github.com/influx6/relay/relay"
@@ -235,8 +234,7 @@ func main() {
 
 	server := engine.NewEngine(engine.NewConfig(), func(app *engine.Engine) {
 
-		vfsPro := http.FileServer(vfs.FS(app.IsProduction))
-		app.GET("/static/*",relay.WrapRouteHandler(vfsPro))
+		app.ServeDir("/static/*",app.Static.Dir,app.Static.Strip)
 
 	})
 
@@ -255,7 +253,6 @@ func main() {
 import (
 
 	// remove the _ when ready to use
-	_ "{{staticpkg}}"
 	_ "{{clientpkg}}"
 
 	"github.com/gopherjs/gopherjs/js"
@@ -276,10 +273,6 @@ addr: %s
 env: dev
 
 hearbeat: %dm
-
-
-# output folder for go virtualfiles
-vfs: ./vfs
 
 # directory and settings for static code
 static:
@@ -310,7 +303,7 @@ var (
 		"shared",
 		"templates",
 		"static",
-		"vfs",
 		"vendor",
+		// "vfs",
 	}
 )

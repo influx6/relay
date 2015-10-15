@@ -14,9 +14,9 @@ import (
 
 // DefaultBuilder provides a default config for builders
 var DefaultBuilder = BuildConfig{
-	Addr:    ":8000",
-	Env:     "dev",
-	VFS:     "./vfs",
+	Addr: ":8000",
+	Env:  "dev",
+	// VFS:     "./vfs",
 	Bin:     "./bin",
 	Main:    "./main.go",
 	DoGoGet: "true",
@@ -74,10 +74,10 @@ type StaticConfig struct {
 
 // BuildConfig provides the configuration details for the building constraints for using relay's builder
 type BuildConfig struct {
-	Name          string        `yaml:"name"`
-	Addr          string        `yaml:"addr"`
-	Env           string        `yaml:"env"`
-	VFS           string        `yaml:"vfs"`
+	Name string `yaml:"name"`
+	Addr string `yaml:"addr"`
+	Env  string `yaml:"env"`
+	// VFS           string        `yaml:"vfs"`
 	Bin           string        `yaml:"bin"`
 	Main          string        `yaml:"main"`
 	Package       string        `yaml:"package"`

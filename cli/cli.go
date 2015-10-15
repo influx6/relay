@@ -185,7 +185,7 @@ var jsBuilder = func(pwd string, config *BuildConfig) error {
 		verbose = bo
 	}
 
-	session := NewJSSession(config.VFS, config.Client.BuildTags, verbose, false)
+	session := NewJSSession(config.Client.StaticDir, config.Client.BuildTags, verbose, false)
 
 	js, jsmap, err := session.BuildPkg(config.ClientPackage, config.Client.Name)
 
@@ -259,56 +259,57 @@ var binBuilder = func(pwd string, config *BuildConfig) error {
 	return nil
 }
 
-var assetsBuilder = func(pwd string, config *BuildConfig) error {
-	if err := jsBuilder(pwd, config); err != nil {
-		return err
-	}
-
-	var err error
-	fmt.Printf("--> Building static files in %s to %s/vfs_static.go \n", config.Static.Dir, config.VFS)
-
-	virtualfile := filepath.Join(config.VFS, "vfs_static.go")
-
-	virtualsets := []string{
-		filepath.Join(pwd, config.Static.Dir),
-		filepath.Join(pwd, "templates"),
-	}
-
-	var strip string
-	var ustrip = filepath.Join(pwd, config.Static.StripPrefix)
-
-	if _, err := os.Stat(ustrip); err == nil {
-		strip = ustrip
-	} else {
-		strip = pwd
-	}
-
-	fmt.Printf("--> Using StripPrefix (%s) for all virtual paths \n", strip)
-
-	var done = make(chan bool)
-	// var dev = (config.Env == "dev" || strings.Contains(config.Env, "dev"))
-
-	err = BundleStatic(virtualfile, "vfs", config.Static.Exclude, pwd, virtualsets, nil, func() error {
-		close(done)
-		return nil
-	}, false)
-
-	if err != nil {
-		fmt.Printf("--> --> go.mkdir.vfs.static: for %s -> %s\n", virtualfile, err)
-		return err
-	}
-
-	<-done
-	return nil
-}
+// var assetsBuilder = func(pwd string, config *BuildConfig) error {
+// 	var err error
+// 	fmt.Printf("--> Building static files in %s to %s/vfs_static.go \n", config.Static.Dir, config.VFS)
+//
+// 	virtualfile := filepath.Join(config.VFS, "vfs_static.go")
+//
+// 	virtualsets := []string{
+// 		filepath.Join(pwd, config.Static.Dir),
+// 		filepath.Join(pwd, "templates"),
+// 	}
+//
+// 	var strip string
+// 	var ustrip = filepath.Join(pwd, config.Static.StripPrefix)
+//
+// 	if _, err := os.Stat(ustrip); err == nil {
+// 		strip = ustrip
+// 	} else {
+// 		strip = pwd
+// 	}
+//
+// 	fmt.Printf("--> Using StripPrefix (%s) for all virtual paths \n", strip)
+//
+// 	var done = make(chan bool)
+// 	// var dev = (config.Env == "dev" || strings.Contains(config.Env, "dev"))
+//
+// 	err = BundleStatic(virtualfile, "vfs", config.Static.Exclude, pwd, virtualsets, nil, func() error {
+// 		close(done)
+// 		return nil
+// 	}, false)
+//
+// 	if err != nil {
+// 		fmt.Printf("--> --> go.mkdir.vfs.static: for %s -> %s\n", virtualfile, err)
+// 		return err
+// 	}
+//
+// 	<-done
+// 	return nil
+// }
 
 var builder = func(config *BuildConfig) error {
 	pwd, _ := os.Getwd()
 
-	if err := assetsBuilder(pwd, config); err != nil {
-		fmt.Printf("--> --> cmd.assetBuilder.Error: for %s -> %s\n", config.ClientPackage, err)
+	if err := jsBuilder(pwd, config); err != nil {
+		fmt.Printf("--> --> cmd.jsBuilder.Error: for %s -> %s\n", config.ClientPackage, err)
 		return err
 	}
+
+	// if err := assetsBuilder(pwd, config); err != nil {
+	// 	fmt.Printf("--> --> cmd.assetBuilder.Error: for %s -> %s\n", config.ClientPackage, err)
+	// 	return err
+	// }
 
 	if err := binBuilder(pwd, config); err != nil {
 		fmt.Printf("--> --> cmd.binBuilder.Error: for %s -> %s\n", config.ClientPackage, err)
@@ -430,7 +431,7 @@ var serveCommand = &cobra.Command{
 
 		dirpath := filepath.Join(pwd, config.Watcher.Dir)
 		binpath := filepath.Join(pwd, config.Bin)
-		vfspath := filepath.Join(pwd, config.VFS)
+		// vfspath := filepath.Join(pwd, config.VFS)
 
 		var waiting int64
 		var binwaiting int64
@@ -566,10 +567,10 @@ var serveCommand = &cobra.Command{
 				return
 			}
 
-			if strings.Contains(ev.Name, vfspath) {
-				// fmt.Printf("Skipping bin dir changes @ %s\n", ev.Name)
-				return
-			}
+			// if strings.Contains(ev.Name, vfspath) {
+			// 	// fmt.Printf("Skipping bin dir changes @ %s\n", ev.Name)
+			// 	return
+			// }
 
 			atomic.StoreInt64(&binwaiting, 1)
 			{

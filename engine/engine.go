@@ -24,7 +24,7 @@ import (
 var DefaultConfig = Config{
 	Addr:      ":8080",
 	Env:       "dev",
-	Folders:   Folders{},
+	Static:    StaticConfig{Dir: "./static"},
 	Heartbeat: "5m",
 	Killbeat:  "2m",
 	Templates: assets.TemplateConfig{
@@ -67,11 +67,10 @@ func (t *TLSConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Folders provide a configuration for app-used folders
-type Folders struct {
-	Assets string `yaml:"assets"`
-	Models string `yaml:"models"`
-	Views  string `yaml:"views"`
+// StaticConfig provides the configuration details for the static files location and arguments
+type StaticConfig struct {
+	Dir         string `yaml:"dir"`
+	StripPrefix string `yaml:"strip_prefix"`
 }
 
 // Db provides a generic db configuration value
@@ -93,7 +92,7 @@ type Config struct {
 	//the timeout for graceful shutdown of server
 	Killbeat     string                `yaml:"killbeat"`
 	C            TLSConfig             `yaml:"tls"`
-	Folders      Folders               `yaml:"folders"`
+	Static       StaticConfig          `yaml:"static"`
 	Db           Db                    `yaml:"db"`
 	Templates    assets.TemplateConfig `yaml:"templates"`
 	IsProduction bool                  `yaml:"-"`
