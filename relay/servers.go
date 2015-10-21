@@ -75,7 +75,7 @@ func MakeListener(addr, ts string, conf *tls.Config) (net.Listener, error) {
 	var l net.Listener
 	var err error
 
-	if conf == nil {
+	if conf != nil {
 		l, err = tls.Listen(ts, addr, conf)
 	} else {
 		l, err = net.Listen(ts, addr)

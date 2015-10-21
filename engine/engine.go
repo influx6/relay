@@ -214,7 +214,8 @@ func (a *Engine) prepareServer() error {
 		a.BeforeInit(a)
 	}
 
-	ls, err = relay.MakeBaseListener(a.Addr, a.C.Certs)
+	// ls, err = relay.MakeBaseListener(a.Addr, a.C.Certs)
+	ls, err = relay.MakeListener(a.Addr, "tcp", a.C.Certs)
 
 	if err != nil {
 		log.Fatalf("Server failed to create tcp listener %+s", err.Error())
