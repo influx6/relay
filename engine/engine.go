@@ -14,9 +14,7 @@ import (
 
 	"github.com/imdario/mergo"
 	"github.com/influx6/assets"
-	"github.com/influx6/flux"
 	"github.com/influx6/relay/relay"
-	"github.com/tylerb/graceful"
 	"gopkg.in/yaml.v2"
 )
 
@@ -138,10 +136,12 @@ func (c *Config) Load(file string) error {
 type Engine struct {
 	*relay.Routes
 	*Config
-	li              *graceful.Server
-	ls              net.Listener
-	stop, heartbeat time.Duration
-	Template        *assets.TemplateDir
+	// li              *graceful.Server
+	ls        net.Listener
+	sl        *http.Server
+	stop      time.Duration
+	heartbeat time.Duration
+	Template  *assets.TemplateDir
 	//HeartBeats is run a constant rate every ms provided
 	HeartBeats func(*Engine)
 	//BeforeInit is run right before the server is started
@@ -169,18 +169,6 @@ func NewEngine(c *Config, init func(*Engine)) *Engine {
 }
 
 func (a *Engine) loadup() error {
-	//is the asset folder not empty?, if so load it up
-	// if a.Folders.Assets != "" {
-	//
-	// 	log.Printf("Setting up assets dir: %s", a.Folders.Assets)
-	// 	if _, err := os.Stat(a.Folders.Assets); err != nil {
-	// 		return err
-	// 	}
-	//
-	// 	a.ServeDir("/assets", a.Folders.Assets, "/assets/")
-	// 	log.Printf("Done loading assets dir: %s", a.Folders.Assets)
-	// }
-
 	if a.OnInit != nil {
 		a.OnInit(a)
 	}
@@ -229,23 +217,31 @@ func (a *Engine) prepareServer() error {
 	ls, err = relay.MakeBaseListener(a.Addr, a.C.Certs)
 
 	if err != nil {
-		log.Fatalf("Server failed to start: %+s", err.Error())
+		log.Fatalf("Server failed to create tcp listener %+s", err.Error())
+		return err
+	}
+
+	sl, _, err := relay.MakeBaseServer(ls, a, a.C.Certs)
+
+	if err != nil {
+		log.Fatalf("Server failed to create tcp server: %+s", err.Error())
 		return err
 	}
 
 	a.ls = ls
-	a.li = &graceful.Server{
-		NoSignalHandling: true,
-		Timeout:          a.stop,
-		Server: &http.Server{
-			Addr:    a.Addr,
-			Handler: a,
-		},
-	}
+	a.sl = sl
+	// a.li = &graceful.Server{
+	// 	NoSignalHandling: true,
+	// 	Timeout:          a.stop,
+	// 	Server: &http.Server{
+	// 		Addr:    a.Addr,
+	// 		Handler: a,
+	// 	},
+	// }
 
-	flux.GoDefer("ServerGracefulServer", func() {
-		a.li.Serve(ls)
-	})
+	// flux.GoDefer("ServerGracefulServer", func() {
+	// 	a.li.Serve(ls)
+	// })
 
 	//load up configurations
 	if err := a.loadup(); err != nil {
@@ -275,9 +271,10 @@ func (a *Engine) Close() error {
 		}
 	}()
 
-	if a.li == nil {
+	if a.ls == nil {
 		return os.ErrInvalid
 	}
-	a.li.Stop(a.stop)
+	// a.li.Stop(a.stop)
+	a.ls.Close()
 	return nil
 }
