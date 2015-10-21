@@ -1,14 +1,17 @@
 package relay
 
-import "net/http/pprof"
+import (
+	"log"
+	"net/http/pprof"
+)
 
 // NewPProfController provides an instantiated endpoint for pprofiles
 func NewPProfController() *PProfController {
 	db := &PProfController{NewController("/debug")}
-	db.BindHTTP("get head", "/", db.Index)
-	db.BindHTTP("get head", "/profile", db.Profile)
-	db.BindHTTP("get head", "/trace", db.Trace)
-	db.BindHTTP("get head", "/symbol", db.Symbol)
+	// db.BindHTTP("get head", "/pprof/profile", db.Profile)
+	// db.BindHTTP("get head", "/pprof/trace", db.Trace)
+	// db.BindHTTP("get head", "/pprof/symbol", db.Symbol)
+	db.BindHTTP("get head", "/pprof/*", db.Index)
 	return db
 }
 
@@ -19,6 +22,7 @@ type PProfController struct {
 
 // Profile provides the pprof Profile endpoint
 func (p *PProfController) Profile(c *Context, next NextHandler) {
+	log.Printf("profile getting hit")
 	pprof.Profile(c.Res, c.Req)
 	next(c)
 }

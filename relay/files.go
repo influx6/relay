@@ -5,7 +5,24 @@ import (
 	"mime"
 	"net/http"
 	filepath "path/filepath"
+	"strings"
 )
+
+var mediaTypes = map[string]string{
+	".txt":      "text/plain",
+	".text":     "text/plain",
+	".html":     "text/html",
+	".css":      "text/css",
+	".js":       "text/javascript",
+	".haml":     "text/haml",
+	".markdown": "text/markdown",
+	".md":       "text/markdown",
+	".svg":      "image/svg+xml",
+	".png":      "image/png",
+	".jpg":      "image/jpg",
+	".gif":      "image/png",
+	".mp3":      "audio/mp3",
+}
 
 // ServeFile provides a file handler for serving files, it takes an indexFile which defines a default file to look for if the file path is a directory ,then the directory to use and the file to be searched for
 func ServeFile(indexFile, dir, file string, res http.ResponseWriter, req *http.Request) error {
@@ -18,7 +35,7 @@ func ServeFile(indexFile, dir, file string, res http.ResponseWriter, req *http.R
 		return NewCustomError("http.ServeFile.Status", fmt.Sprintf("%d", http.StatusNotFound))
 	}
 
-	ext := filepath.Ext(file)
+	ext := strings.ToLower(filepath.Ext(file))
 
 	fi, _ := f.Stat()
 	if fi.IsDir() {
@@ -30,10 +47,18 @@ func ServeFile(indexFile, dir, file string, res http.ResponseWriter, req *http.R
 		fi, _ = f.Stat()
 	}
 
-	// cext := mime.TypeByExtension(ext)
-	// if cext != "" {
-	res.Header().Add("Content-Type", mime.TypeByExtension(ext))
-	// }
+	cext := mime.TypeByExtension(ext)
+
+	if cext == "" {
+		if types, ok := mediaTypes[ext]; ok {
+			cext = types
+		} else {
+			cext = "text/plain"
+		}
+	}
+
+	res.Header().Set("Content-Type", cext)
+
 	http.ServeContent(res, req, fi.Name(), fi.ModTime(), f)
 	return nil
 }
