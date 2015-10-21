@@ -4,7 +4,10 @@ import (
 	"errors"
 	"net/http"
 
+	"net/http/pprof"
+
 	"github.com/gorilla/websocket"
+	"github.com/influx6/relay/relay"
 )
 
 // ErrPatternBound is returned when the pattern is bound
@@ -47,4 +50,38 @@ func (c *Controller) BindHTTP(mo, pattern string, fx FlatHandler) FlatChains {
 	hs := NewFlatChain(fx)
 	c.Add(mo, pattern, hs.Handle)
 	return hs
+}
+
+// NewPProfController provides an instantiated endpoint for pprofiles
+func NewPProfController() *PProfController {
+	return PProfController{NewController("debug")}
+}
+
+// PProfController provide pprofile handlers
+type PProfController struct {
+	*Controller
+}
+
+// Profile provides the pprof Profile endpoint
+func (p *PProfController) Profile(c *Context, next relay.NextHandler) {
+	pprof.Profile(c.Res, c.Req)
+	next(c)
+}
+
+// Index provides the pprof Index endpoint
+func (p *PProfController) Index(c *Context, next relay.NextHandler) {
+	pprof.Index(c.Res, c.Req)
+	next(c)
+}
+
+// Symbol provides the pprof Symbol endpoint
+func (p *PProfController) Symbol(c *Context, next relay.NextHandler) {
+	pprof.Symbol(c.Res, c.Req)
+	next(c)
+}
+
+// Trace provides the pprof Trace endpoint
+func (p *PProfController) Trace(c *Context, next relay.NextHandler) {
+	pprof.Trace(c.Res, c.Req)
+	next(c)
 }
