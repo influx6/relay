@@ -14,6 +14,8 @@ var mediaTypes = map[string]string{
 	".html":     "text/html",
 	".css":      "text/css",
 	".js":       "text/javascript",
+	".erb":      "template/erb",
+	".min.css":  "text/css",
 	".haml":     "text/haml",
 	".markdown": "text/markdown",
 	".md":       "text/markdown",
@@ -47,8 +49,10 @@ func ServeFile(indexFile, dir, file string, res http.ResponseWriter, req *http.R
 		fi, _ = f.Stat()
 	}
 
+	// var cext string
 	cext := mime.TypeByExtension(ext)
 
+	// log.Printf("Type ext: %s -> %s", ext, cext)
 	if cext == "" {
 		if types, ok := mediaTypes[ext]; ok {
 			cext = types
