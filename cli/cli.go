@@ -514,9 +514,9 @@ var serveCommand = &cobra.Command{
 			}
 			atomic.StoreInt64(&waiting, 0)
 
-			if binWatcher != nil {
-				binWatcher.ForceNotify()
-			}
+			// if binWatcher != nil {
+			// 	binWatcher.ForceNotify()
+			// }
 		})
 
 		binWatcher, err = assets.NewWatch(assets.WatcherConfig{
