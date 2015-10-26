@@ -14,16 +14,15 @@ import (
 
 // DefaultBuilder provides a default config for builders
 var DefaultBuilder = BuildConfig{
-	Addr: ":8000",
-	Env:  "dev",
-	// VFS:     "./vfs",
+	Addr:    ":8000",
+	Env:     "dev",
 	Bin:     "./bin",
 	Main:    "./main.go",
 	DoGoGet: "true",
 	UseMain: "false",
 	Client: JSConfig{
 		Dir:       "./client",
-		StaticDir: "static/js",
+		StaticDir: "./static/js",
 		Name:      "client",
 		Verbose:   "false",
 	},
@@ -72,22 +71,30 @@ type StaticConfig struct {
 	TemplateExtension string   `yaml:"template_ext"`
 }
 
+// PluginConfig defines a plugins values
+type PluginConfig map[string]string
+
+// Plugins represent a map of pluginConfigs
+type Plugins map[string]PluginConfig
+
 // BuildConfig provides the configuration details for the building constraints for using relay's builder
 type BuildConfig struct {
-	Name string `yaml:"name"`
-	Addr string `yaml:"addr"`
-	Env  string `yaml:"env"`
-	// VFS           string        `yaml:"vfs"`
-	Bin           string        `yaml:"bin"`
-	Main          string        `yaml:"main"`
-	Package       string        `yaml:"package"`
-	BinArgs       []string      `yaml:"bin_args"`
-	Client        JSConfig      `yaml:"client"`
-	Static        StaticConfig  `yaml:"static"`
-	Watcher       WatcherConfig `yaml:"watcher"`
-	ClientPackage string        `yaml:"-"`
-	Goget         bool          `yaml:"-"`
-	GoMain        bool          `yaml:"-"`
+	Name    string        `yaml:"name"`
+	Addr    string        `yaml:"addr"`
+	Env     string        `yaml:"env"`
+	Bin     string        `yaml:"bin"`
+	Main    string        `yaml:"main"`
+	Package string        `yaml:"package"`
+	BinArgs []string      `yaml:"bin_args"`
+	Client  JSConfig      `yaml:"client"`
+	Static  StaticConfig  `yaml:"static"`
+	Watcher WatcherConfig `yaml:"watcher"`
+	Plugins Plugins       `yaml:"plugin"`
+
+	ClientPackage string `yaml:"-"`
+	Goget         bool   `yaml:"-"`
+	GoMain        bool   `yaml:"-"`
+
 	//Commands will be executed before any building of assets or compiling of binary
 	Commands []string `yaml:"commands"`
 	//dogoget ensures that after the first initial building that go get gets re-run on each rebuild
