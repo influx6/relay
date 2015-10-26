@@ -149,7 +149,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
 # Example
 
-  See [Relay Readme](https://github.com/influx6/relay/relay)
+  See [Relay Readme](https://github.com/influx6/relay/tree/master/relay)
 
 #License
 
