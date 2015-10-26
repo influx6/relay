@@ -50,7 +50,7 @@ Relay is a simple microframework with very simple designs that provide you with 
             tag: commandWatch #the plugin to use
             config: # a map of usable values, plugin defined
               path: "./static/less"
-            args: # optional arguments but needed in this plugins case
+            args: # optional arguments but needed in this plugins use case
               - lessc ./static/less/main.less ./static/css/main.css
               - lessc ./static/less/svg.less ./static/css/svg.css
       ```
@@ -61,9 +61,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
    - Command Example:
 
-
-
-         ```bash
+     ```bash
 
           # once installation is done using 'go get'
 
@@ -148,45 +146,6 @@ Relay is a simple microframework with very simple designs that provide you with 
                 package: github.com/influx6/wonderbat
 
       ```
-
-
-   - where "main.go" contains =>
-
-
-      ```go
-                package main
-
-                import (
-                	//remove the _ when ready to use
-                	_ "github.com/influx6/wonderbat/controllers"
-                	"github.com/influx6/wonderbat/vfs"
-
-                	"net/http"
-
-                	"github.com/influx6/relay/engine"
-                	"github.com/influx6/relay/relay"
-                )
-
-                func main() {
-
-                	server := engine.NewEngine(engine.NewConfig(), func(app *engine.Engine) {
-
-                    //using the auto-build virtual fs static assets
-                		vfsPro := http.FileServer(vfs.FS(app.IsProduction))
-                		app.GET("/static/*", relay.WrapRouteHandler(vfsPro))
-
-                	})
-
-                	if err := server.Load("./app.yml"); err != nil {
-                		panic(err)
-                	}
-
-                	server.Serve()
-
-                }
-      ```
-
-
 
 # Example
 
