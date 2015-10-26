@@ -22,7 +22,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
       - watchBuildRun(internal use only): This manages the building of entire codebase during use of `relay serve`
 
-      - goFriday: This allows setting a command to run on every changes in a directory path, to use just include in config as below:
+      - goFriday: This automatically converts your markdown files and saves them in order in a given directory, very useful for writing docs
 
       ```yaml
 
@@ -39,7 +39,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
       ```
 
-      - commandWatch: This allows setting a command to run on every changes in a directory path, to use just include in config as below:
+      - commandWatch: This allows setting a series of commands to run on every changes in a directory path, to use just include in config as below:
 
       ```yaml
 
