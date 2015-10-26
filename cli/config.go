@@ -21,30 +21,13 @@ var DefaultBuilder = BuildConfig{
 	DoGoGet: "true",
 	UseMain: "false",
 	Client: JSConfig{
-		Dir:       "./client",
 		StaticDir: "./static/js",
 		Name:      "client",
 		Verbose:   "false",
 	},
 	Static: StaticConfig{
-		Dir:               "./static",
-		TemplateExtension: ".tmpl",
+		Dir: "./static",
 	},
-	Watcher: WatcherConfig{
-		Dir:      "./",
-		MaxRetry: 5,
-	},
-}
-
-// WatcherConfig to be used with watcher
-type WatcherConfig struct {
-	Dir      string   `yaml:"-"`
-	Ext      []string `yaml:"ext"`
-	Skip     []string `yaml:"skip"`
-	Pkgs     []string `yaml:"pkgs"`
-	Max      string   `yaml:"max"`
-	MaxRetry int      `yaml:"-"`
-	Retry    int      `yaml:"-"`
 }
 
 // JSConfig provides the configuration details for the gopherjs project location and arguments
@@ -59,41 +42,44 @@ type JSConfig struct {
 	// StaticDir defines the location in the static directory the compiled version will also be stored for cases when you decide to not use the virtual fs
 	StaticDir string `yaml:"static_dir"`
 	//Verbose sets the verbosity of the build process
-	Verbose string `yaml:"verbose"`
+	Verbose    string `yaml:"verbose"`
+	UseVerbose bool   `yaml:"-"`
 }
 
 // StaticConfig provides the configuration details for the static files location and arguments
 type StaticConfig struct {
-	Dir               string   `yaml:"dir"`
-	StripPrefix       string   `yaml:"strip_prefix"`
-	Exclude           string   `yaml:"exclude"`
-	Extensions        []string `yaml:"exts"`
-	TemplateExtension string   `yaml:"template_ext"`
+	Dir         string `yaml:"dir"`
+	StripPrefix string `yaml:"strip_prefix"`
+	Exclude     string `yaml:"exclude"`
 }
 
 // PluginConfig defines a plugins values
 type PluginConfig map[string]string
 
 // Plugins represent a map of pluginConfigs
-type Plugins map[string]PluginConfig
+type Plugins struct {
+	Tag    string       `yaml:"tag"`
+	Args   []string     `yaml:"args"`
+	Config PluginConfig `yaml:"config"`
+}
 
 // BuildConfig provides the configuration details for the building constraints for using relay's builder
 type BuildConfig struct {
-	Name    string        `yaml:"name"`
-	Addr    string        `yaml:"addr"`
-	Env     string        `yaml:"env"`
-	Bin     string        `yaml:"bin"`
-	Main    string        `yaml:"main"`
-	Package string        `yaml:"package"`
-	BinArgs []string      `yaml:"bin_args"`
-	Client  JSConfig      `yaml:"client"`
-	Static  StaticConfig  `yaml:"static"`
-	Watcher WatcherConfig `yaml:"watcher"`
-	Plugins Plugins       `yaml:"plugin"`
+	Name    string             `yaml:"name"`
+	Addr    string             `yaml:"addr"`
+	Env     string             `yaml:"env"`
+	Bin     string             `yaml:"bin"`
+	Main    string             `yaml:"main"`
+	Package string             `yaml:"package"`
+	BinArgs []string           `yaml:"bin_args"`
+	Client  JSConfig           `yaml:"client"`
+	Static  StaticConfig       `yaml:"static"`
+	Plugins map[string]Plugins `yaml:"plugins"`
 
-	ClientPackage string `yaml:"-"`
-	Goget         bool   `yaml:"-"`
-	GoMain        bool   `yaml:"-"`
+	ClientPackage string         `yaml:"-"`
+	Goget         bool           `yaml:"-"`
+	GoMain        bool           `yaml:"-"`
+	BuildPlugin   *PluginManager `yaml:"-"`
 
 	//Commands will be executed before any building of assets or compiling of binary
 	Commands []string `yaml:"commands"`
@@ -106,6 +92,7 @@ type BuildConfig struct {
 // NewBuildConfig returns a new BuildConfig based off the defaults
 func NewBuildConfig() *BuildConfig {
 	bc := DefaultBuilder
+	bc.BuildPlugin = NewPluginManager()
 	return &bc
 }
 
@@ -138,12 +125,12 @@ func (c *BuildConfig) Load(file string) error {
 		c.GoMain = mano
 	}
 
-	if doge, err := strconv.ParseBool(c.DoGoGet); err == nil {
-		c.Goget = doge
+	if vbo, err := strconv.ParseBool(c.Client.Verbose); err == nil {
+		c.Client.UseVerbose = vbo
 	}
 
-	if max, err := strconv.Atoi(c.Watcher.Max); err == nil {
-		c.Watcher.MaxRetry = max
+	if doge, err := strconv.ParseBool(c.DoGoGet); err == nil {
+		c.Goget = doge
 	}
 
 	c.ClientPackage = filepath.Join(c.Package, "client")

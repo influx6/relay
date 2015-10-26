@@ -5,123 +5,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 
-	"github.com/influx6/assets"
-	"github.com/influx6/reactors/builders"
-	"github.com/influx6/reactors/fs"
 	"github.com/spf13/cobra"
 )
 
 var name string
 var owner string
-
-var plugins = func() *PluginManager {
-	pm := NewPluginManager()
-
-	pm.Add("builder", func(config *BuildConfig, options map[string]string, killer chan bool) {
-		pwd, _ := os.Getwd()
-		_, binName := filepath.Split(config.Package)
-		// bin := filepath.Join(pwd, config.Bin)
-
-		goget := builders.GoInstallerWith("./")
-		gobuild := builders.GoBuilderWith(builders.BuildConfig{
-			Path: filepath.Join(pwd, config.Bin),
-			Name: binName,
-			Args: config.BinArgs,
-		})
-
-		goget.Bind(gobuild, true)
-		//run go installer
-		goget.Send(true)
-
-		go func() {
-			for {
-				select {
-				case <-killer:
-					//close our builders
-					goget.Close()
-					gobuild.Close()
-				}
-			}
-		}()
-	})
-
-	pm.Add("watchBuildRun", func(config *BuildConfig, options map[string]string, c chan bool) {
-		pwd, _ := os.Getwd()
-		_, binName := filepath.Split(config.Package)
-		binDir := filepath.Join(pwd, config.Bin)
-		binfile := filepath.Join(binDir, binName)
-
-		pkgs := append([]string{}, config.Package, "github.com/influx6/relay/relay", "github.com/influx6/relay/engine")
-
-		packages, err := assets.GetAllPackageLists(pkgs)
-
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Printf("--> Retrieved package directories %s for %s\n", config.Package, pkgs)
-
-		goget := builders.GoInstallerWith("./")
-
-		buildbin := builders.BinaryBuildLauncher(builders.BinaryBuildConfig{
-			Path:    binDir,
-			Name:    binName,
-			RunArgs: config.BinArgs,
-		})
-
-		goget.Bind(buildbin, true)
-
-		fmt.Printf("--> Initializing File Watcher using package dependecies at %d\n", len(packages))
-
-		watcher := fs.WatchSet(fs.WatchSetConfig{
-			Path: packages,
-			Validator: func(base string, info os.FileInfo) bool {
-				if strings.Contains(base, ".git") {
-					return false
-				}
-
-				if strings.Contains(base, binDir) || base == binDir {
-					// log.Printf("bin file found path %s", base)
-					return false
-				}
-
-				if strings.Contains(base, binfile) || base == binfile {
-					return false
-				}
-
-				if !strings.Contains(base, ".go") && filepath.Ext(base) == ".go" {
-					return false
-				}
-
-				return true
-			},
-		})
-
-		watcher.Bind(goget, true)
-
-		fmt.Printf("--> Sending signal for 'go get'\n")
-		//run go installer
-		goget.Send(true)
-
-		fmt.Printf("--> Initializing Interrupt Signal  Watcher for %s@%s\n", binName, binfile)
-		go func() {
-			for {
-				select {
-				case <-c:
-					//close our builders
-					watcher.Close()
-					goget.Close()
-					buildbin.Close()
-				}
-			}
-		}()
-	})
-
-	return pm
-}()
 
 // CreateCommand creates a new relay project
 var createCommand = &cobra.Command{
@@ -139,8 +29,6 @@ var createCommand = &cobra.Command{
         |--->templates
         |--->models
         |--->static
-        |--->vfs
-	        |--->vfs.go
         |--->app.yaml
         |--->main.go
 
@@ -201,11 +89,7 @@ var createCommand = &cobra.Command{
 			panic(err)
 		}
 
-		maincontent := strings.Replace(appgofile, "{{controllerpkg}}", fmt.Sprintf("github.com/%s/%s/controllers", owner, name), -1)
-
-		maincontent = strings.Replace(maincontent, "{{staticpkg}}", fmt.Sprintf("github.com/%s/%s/vfs", owner, name), -1)
-
-		fmt.Fprintf(appmainfile, maincontent)
+		fmt.Fprintf(appmainfile, appgofile)
 		appmainfile.Close()
 
 		fmt.Printf("--> Creating project file: controllers/controllers.go \n")
@@ -220,19 +104,6 @@ var createCommand = &cobra.Command{
 
 		fmt.Fprint(cfsfile, "package controllers")
 		cfsfile.Close()
-
-		fmt.Printf("--> Creating project file: vfs/vfs_static.go \n")
-
-		vfs := filepath.Join(project, "vfs/vfs_static.go")
-
-		vfsfile, err := os.Create(vfs)
-
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Fprint(vfsfile, vsgofile)
-		vfsfile.Close()
 
 		fmt.Printf("--> Creating project file: app.yml\n")
 		appyml := filepath.Join(project, "app.yml")
@@ -256,11 +127,7 @@ var createCommand = &cobra.Command{
 			panic(err)
 		}
 
-		clientcontent := strings.Replace(clientfile, "{{staticpkg}}", fmt.Sprintf("github.com/%s/%s/vfs", owner, name), -1)
-
-		clientcontent = strings.Replace(clientcontent, "{{clientpkg}}", fmt.Sprintf("github.com/%s/%s/%s/%s", owner, name, "client", "app"), -1)
-
-		fmt.Fprint(cgofile, clientcontent)
+		fmt.Fprint(cgofile, clientfile)
 		cgofile.Close()
 
 		clientbase := filepath.Join(project, "client/app/app.go")
@@ -278,52 +145,6 @@ var createCommand = &cobra.Command{
 
 	},
 }
-
-// var jsBuilder = func(pwd string, config *BuildConfig) error {
-//
-// 	session := NewJSSession(config.Client.StaticDir, config.Client.BuildTags, verbose, false)
-//
-// 	js, jsmap, err := session.BuildPkg(config.ClientPackage, config.Client.Name)
-//
-// 	if err != nil {
-// 		fmt.Printf("--> --> go.goperjs.build.Error: for %s -> %s\n", config.ClientPackage, err)
-// 		return err
-// 	}
-//
-// 	fmt.Printf("--> Making static/js directory if not exisitng \n")
-//
-// 	jsdir := filepath.Join(pwd, config.Client.StaticDir)
-// 	_ = os.MkdirAll(jsdir, 0777)
-//
-// 	return nil
-// }
-//
-// var binBuilder = func(pwd string, config *BuildConfig) error {
-// 	pkg, err := build.Import(config.Package, "", 0)
-//
-// 	_, binName := filepath.Split(pkg.ImportPath)
-//
-// 	if config.Goget {
-// 		fmt.Printf("--> Running go get for %s\n", pkg.ImportPath)
-// 		_, err = GoDeps(pkg.ImportPath)
-//
-// 		if err != nil {
-// 			fmt.Printf("--> --> go.get.Error: %s\n", err)
-// 			return err
-// 		}
-// 	}
-//
-// 	fmt.Printf("--> Building binary file into %s\n", config.Bin)
-//
-// 	_, err = Gobuild(config.Bin, binName)
-//
-// 	if err != nil {
-// 		fmt.Printf("--> --> go.build.Error: %s\n", err)
-// 		return err
-// 	}
-//
-// 	return nil
-// }
 
 // BuildCommand builds the relay project
 var buildCommand = &cobra.Command{
@@ -352,8 +173,11 @@ var buildCommand = &cobra.Command{
 			return
 		}
 
+		//setup the plugins
+		RegisterDefaultPlugins(config.BuildPlugin)
+
 		var kill = make(chan bool)
-		go plugins.Activate("builder", config, nil, kill)
+		go config.BuildPlugin.Activate(Plugins{Tag: "builder"}, config, kill)
 		close(kill)
 	},
 }
@@ -385,10 +209,23 @@ var serveCommand = &cobra.Command{
 		}
 
 		//setup the plugins
+		RegisterDefaultPlugins(config.BuildPlugin)
 
 		var kill = make(chan bool)
-		go plugins.Activate("watchBuildRun", config, nil, kill)
-		// config.Watcher.Pkgs = append(config.Watcher.Pkgs, config.Package, "github.com/influx6/relay/relay", "github.com/influx6/relay/engine")
+
+		//run the binary builder
+		go config.BuildPlugin.Activate(Plugins{Tag: "watchBuildRun"}, config, kill)
+
+		//run the js builder
+		go config.BuildPlugin.Activate(Plugins{Tag: "jsWatchBuild"}, config, kill)
+
+		//loadup the remaining plugins so they can activate themselves
+		for _, mem := range config.Plugins {
+			if mem.Tag == "watchBuildRun" || mem.Tag == "builder" {
+				continue
+			}
+			go config.BuildPlugin.Activate(mem, config, kill)
+		}
 
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGQUIT)

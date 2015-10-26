@@ -2,6 +2,7 @@ package engine
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -182,7 +183,7 @@ func (a *Engine) Serve() {
 		panic(err)
 	}
 
-	log.Printf("Application %s running @ %s", a.Name, a.Addr)
+	fmt.Printf("--> Application %s running @ %s\n", a.Name, a.Addr)
 
 	//setup the signal block and listen for the interrup
 	ch := make(chan os.Signal, 1)

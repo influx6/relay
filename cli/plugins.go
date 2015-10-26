@@ -7,7 +7,7 @@ import (
 )
 
 // PluginMux defines a function type for a plugin activator
-type PluginMux func(*BuildConfig, map[string]string, chan bool)
+type PluginMux func(*BuildConfig, Plugins, chan bool)
 
 // PluginManager provides a basic plugin management system for the cli
 type PluginManager struct {
@@ -26,11 +26,11 @@ func (pm *PluginManager) Add(name string, fx PluginMux) {
 }
 
 // Activate activates a specific plugin
-func (pm *PluginManager) Activate(name string, b *BuildConfig, m map[string]string, c chan bool) {
-	br := pm.plugins.Get(name)
+func (pm *PluginManager) Activate(m Plugins, b *BuildConfig, c chan bool) {
+	br := pm.plugins.Get(m.Tag)
 	if br != nil {
 		if bx, ok := br.(PluginMux); ok {
-			fmt.Printf("--> Plugin: Initializing Plugin %s \n", name)
+			fmt.Printf("--> Plugin: Initializing Plugin: '%s' \n", m.Tag)
 			bx(b, m, c)
 		}
 	}
