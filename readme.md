@@ -31,9 +31,9 @@ Relay is a simple microframework with very simple designs that provide you with 
                 config:
                   in: ./templates
                   out: ./vfs
-          				package: vfs
-          				file: template_vfs
-          				gzipped: true
+                  package: vfs
+                  file: template_vfs
+                  gzipped: true
                   production: true
                   # you can also force noDecompression to have gzipped returned data instead of raw data if gzip is active
                   nodecompression: true
