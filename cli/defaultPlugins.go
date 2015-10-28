@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -120,7 +119,7 @@ func addWatchBuildRun(pm *PluginManager) {
 					return false
 				}
 
-				if info.IsDir() {
+				if info != nil && info.IsDir() {
 					return true
 				}
 
@@ -172,7 +171,7 @@ func addJSWatchBuild(pm *PluginManager) {
 			panic(err)
 		}
 
-		packages = append(packages, pwd)
+		// packages = append(packages, pwd)
 		fmt.Printf("--> Retrieved js package directories %s \n", config.Package)
 
 		var clientdir string
@@ -209,7 +208,7 @@ func addJSWatchBuild(pm *PluginManager) {
 					return false
 				}
 
-				if info.IsDir() {
+				if info != nil && info.IsDir() {
 					return true
 				}
 
@@ -217,7 +216,7 @@ func addJSWatchBuild(pm *PluginManager) {
 					return false
 				}
 
-				log.Printf("allowed: %s", base)
+				// log.Printf("allowed: %s", base)
 				return true
 			},
 		})
@@ -277,6 +276,11 @@ func addJSWatchBuild(pm *PluginManager) {
 			Path: absDir,
 		})
 
+		watcher.React(flux.SimpleMuxer(func(root flux.Reactor, data interface{}) {
+			if ev, ok := data.(fsnotify.Event); ok {
+				fmt.Printf("--> commandWatch:File as changed: %+s\n", ev.String())
+			}
+		}), true)
 		// create the command runner set to run the args
 		watcher.Bind(builders.CommandLauncher(commands), true)
 
@@ -344,6 +348,11 @@ func addGoFriday(pm *PluginManager) {
 			Path: absDir,
 		})
 
+		watcher.React(flux.SimpleMuxer(func(root flux.Reactor, data interface{}) {
+			if ev, ok := data.(fsnotify.Event); ok {
+				fmt.Printf("--> goFriday:File as changed: %+s\n", ev.String())
+			}
+		}), true)
 		// create the command runner set to run the args
 		watcher.Bind(gofriday, true)
 
@@ -440,6 +449,12 @@ func addGoStaticBundle(pm *PluginManager) {
 
 		// create the command runner set to run the args
 		watcher.Bind(gostatic, true)
+
+		watcher.React(flux.SimpleMuxer(func(root flux.Reactor, data interface{}) {
+			if ev, ok := data.(fsnotify.Event); ok {
+				fmt.Printf("--> goStatic:File as changed: %+s\n", ev.String())
+			}
+		}), true)
 
 		flux.GoDefer("goStatic:kill", func() {
 			<-c
