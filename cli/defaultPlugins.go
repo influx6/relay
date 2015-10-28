@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -119,6 +120,10 @@ func addWatchBuildRun(pm *PluginManager) {
 					return false
 				}
 
+				if info.IsDir() {
+					return true
+				}
+
 				if filepath.Ext(base) != ".go" {
 					return false
 				}
@@ -167,6 +172,7 @@ func addJSWatchBuild(pm *PluginManager) {
 			panic(err)
 		}
 
+		packages = append(packages, pwd)
 		fmt.Printf("--> Retrieved js package directories %s \n", config.Package)
 
 		var clientdir string
@@ -203,10 +209,15 @@ func addJSWatchBuild(pm *PluginManager) {
 					return false
 				}
 
+				if info.IsDir() {
+					return true
+				}
+
 				if filepath.Ext(base) != ".go" {
 					return false
 				}
 
+				log.Printf("allowed: %s", base)
 				return true
 			},
 		})
