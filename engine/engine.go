@@ -86,6 +86,7 @@ type Config struct {
 	Name      string `yaml:"name"`
 	APIToken  string `yaml:"api_token"`
 	Addr      string `yaml:"addr"`
+	Mode      int    `yaml:"-"`
 	Env       string `yaml:"env"`
 	Heartbeat string `yaml:"heartbeat"`
 	//the timeout for graceful shutdown of server
@@ -94,8 +95,13 @@ type Config struct {
 	Static          StaticConfig          `yaml:"static"`
 	Db              Db                    `yaml:"db"`
 	TemplatesConfig assets.TemplateConfig `yaml:"templates"`
-	IsProduction    bool                  `yaml:"-"`
 }
+
+// DevelopmentMode represents a config en set to DevelopementMode
+const DevelopmentMode = 0
+
+// ProductionMode repesents a config env set to production
+const ProductionMode = 1
 
 // NewConfig returns a new configuration file
 func NewConfig() *Config {
@@ -126,8 +132,10 @@ func (c *Config) Load(file string) error {
 
 	c.Env = strings.TrimSpace(c.Env)
 
-	if !strings.Contains(c.Env, "development") && (c.Env != "dev") && (c.Env != "development") {
-		c.IsProduction = true
+	env := strings.ToLower(c.Env)
+
+	if !strings.Contains(env, "dev") && !strings.Contains(env, "development") && !strings.Contains(env, "debug") {
+		c.Mode = 1
 	}
 
 	return nil

@@ -22,6 +22,23 @@ Relay is a simple microframework with very simple designs that provide you with 
 
       - watchBuildRun(internal use only): This manages the building of entire codebase during use of `relay serve`
 
+      - goStatic: This automatically creates a go file containing all assets within its specified parameters. It watches the directory for any changes and updates the go file. Provides development mode where files are read from disk or production mode where files get bundled and compressed if desired
+
+        ```yaml
+            # using the custom static bundling
+            templateStatic:
+                tag: goStatic
+                config:
+                  in: ./templates
+                  out: ./vfs
+          				package: vfs
+          				file: template_vfs
+          				gzipped: true
+                  production: true
+                  # you can also force noDecompression to have gzipped returned data instead of raw data if gzip is active
+                  nodecompression: true
+        ```
+
       - goFriday: This automatically converts your markdown files and saves them in order in a given directory, very useful for writing docs
 
       ```yaml

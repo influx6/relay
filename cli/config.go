@@ -63,6 +63,12 @@ type Plugins struct {
 	Config PluginConfig `yaml:"config"`
 }
 
+// DevelopmentMode represents a config en set to DevelopementMode
+const DevelopmentMode = 0
+
+// ProductionMode repesents a config env set to production
+const ProductionMode = 1
+
 // BuildConfig provides the configuration details for the building constraints for using relay's builder
 type BuildConfig struct {
 	Name    string             `yaml:"name"`
@@ -76,6 +82,7 @@ type BuildConfig struct {
 	Static  StaticConfig       `yaml:"static"`
 	Plugins map[string]Plugins `yaml:"plugins"`
 
+	Mode          int            `yaml:"-"`
 	ClientPackage string         `yaml:"-"`
 	Goget         bool           `yaml:"-"`
 	GoMain        bool           `yaml:"-"`
@@ -137,6 +144,12 @@ func (c *BuildConfig) Load(file string) error {
 
 	if strings.Contains(c.ClientPackage, `\`) {
 		c.ClientPackage = filepath.ToSlash(c.ClientPackage)
+	}
+
+	env := strings.ToLower(c.Env)
+
+	if !strings.Contains(env, "dev") && !strings.Contains(env, "development") && !strings.Contains(env, "debug") {
+		c.Mode = 1
 	}
 
 	return nil
