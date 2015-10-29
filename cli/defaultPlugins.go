@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -138,6 +139,7 @@ func addWatchBuildRun(pm *PluginManager) {
 			}
 		}), true)
 
+		watcher.Bind(buildbin, true)
 		watcher.Bind(goget, true)
 
 		fmt.Printf("--> Sending signal for 'go get'\n")
@@ -400,12 +402,12 @@ func addGoStaticBundle(pm *PluginManager) {
 
 		var command []string
 
-		// if runtime.GOOS == "windows" {
-		// command = append(command, fmt.Sprintf("copy /b %s +,,", absFile))
-		// command = append(command, fmt.Sprintf("powershell  (ls %s).LastWriteTime = Get-Date", absFile))
-		// } else {
-		command = append(command, fmt.Sprintf("touch %s", absFile))
-		// }
+		if runtime.GOOS == "windows" {
+			command = append(command, fmt.Sprintf("copy /b %s +,,", absFile))
+			// command = append(command, fmt.Sprintf("powershell  (ls %s).LastWriteTime = Get-Date", absFile))
+		} else {
+			command = append(command, fmt.Sprintf("touch %s", absFile))
+		}
 
 		//add the args from the options
 		command = append(command, options.Args...)
