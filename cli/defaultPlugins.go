@@ -403,7 +403,7 @@ func addGoStaticBundle(pm *PluginManager) {
 		var command []string
 
 		if runtime.GOOS == "windows" {
-			command = append(command, fmt.Sprintf("copy /b %s +,,", absFile))
+			command = append(command, fmt.Sprintf("copy /b %s+,,", absFile))
 			// command = append(command, fmt.Sprintf("powershell  (ls %s).LastWriteTime = Get-Date", absFile))
 		} else {
 			command = append(command, fmt.Sprintf("touch %s", absFile))
