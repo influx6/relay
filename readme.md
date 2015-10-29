@@ -28,6 +28,9 @@ Relay is a simple microframework with very simple designs that provide you with 
             # using the custom static bundling
             templateStatic:
                 tag: goStatic
+      					# add commands to run whe done compiling
+      					args:
+      						- touch ./templates/smirf.go
                 config:
                   in: ./templates
                   out: ./vfs

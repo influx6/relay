@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -22,6 +23,7 @@ func RegisterDefaultPlugins(pm *PluginManager) {
 	addGoStaticBundle(pm)
 	addJSWatchBuild(pm)
 	addWatchBuildRun(pm)
+	addCommander(pm)
 }
 
 func addBuilder(pm *PluginManager) {
@@ -240,55 +242,6 @@ func addJSWatchBuild(pm *PluginManager) {
 
 	})
 
-	pm.Add("commandWatch", func(config *BuildConfig, options Plugins, c chan bool) {
-		/*Expects to receive a plugin config follow this format
-
-		  tag: dirWatch
-		  config:
-		    path: "./static/less"
-		  args:
-		    - lessc ./static/less/main.less ./static/css/main.css
-		    - lessc ./static/less/svg.less ./static/css/svg.css
-
-		  where the config.path is the path to be watched
-
-		*/
-
-		//get the current directory
-		pwd, _ := os.Getwd()
-
-		//get the dir we should watch
-		dir := options.Config["path"]
-
-		//get the command we should run on change
-		commands := options.Args
-
-		if dir == "" {
-			fmt.Printf("---> dirWatch.error: no path set in config map for plug")
-			return
-		}
-
-		//get the absolute path
-		absDir := filepath.Join(pwd, dir)
-
-		//create the file watcher
-		watcher := fs.Watch(fs.WatchConfig{
-			Path: absDir,
-		})
-
-		watcher.React(flux.SimpleMuxer(func(root flux.Reactor, data interface{}) {
-			if ev, ok := data.(fsnotify.Event); ok {
-				fmt.Printf("--> commandWatch:File as changed: %+s\n", ev.String())
-			}
-		}), true)
-		// create the command runner set to run the args
-		watcher.Bind(builders.CommandLauncher(commands), true)
-
-		flux.GoDefer("CommandWatch:kill", func() {
-			<-c
-			watcher.Close()
-		})
-	})
 }
 
 func addGoFriday(pm *PluginManager) {
@@ -368,6 +321,9 @@ func addGoStaticBundle(pm *PluginManager) {
 		/*Expects to receive a plugin config follow this format: you can control all aspects of the assets.BindFS using the following
 
 		      tag: gostatic
+					# add commands to run on file changes
+					args:
+						- touch ./templates/smirf.go
 		      config:
 		        in: ./markdown
 		        out: ./templates
@@ -390,6 +346,7 @@ func addGoStaticBundle(pm *PluginManager) {
 		packageName := options.Config["package"]
 		fileName := options.Config["file"]
 		absDir := filepath.Join(pwd, inDir)
+		absFile := filepath.Join(pwd, outDir, fileName+".go")
 
 		if inDir == "" || outDir == "" || packageName == "" || fileName == "" {
 			fmt.Println("---> goStatic.error: the following keys(in,out,package,file) must not be empty")
@@ -442,6 +399,23 @@ func addGoStaticBundle(pm *PluginManager) {
 		//bundle up the assets for the main time
 		gostatic.Send(true)
 
+		var command []string
+
+		if runtime.GOOS == "windows" {
+			// command = append(command, fmt.Sprintf("copy /b %s +,,", absFile))
+			command = append(command, fmt.Sprintf("powershell  (ls %s).LastWriteTime = Get-Date", absFile))
+		} else {
+			command = append(command, fmt.Sprintf("touch %s", absFile))
+		}
+
+		//add the args from the options
+		command = append(command, options.Args...)
+		// log.Printf("command %s", command)
+
+		//adds a CommandLauncher to touch the output file to force a file change notification
+		touchCommand := builders.CommandLauncher(command)
+		gostatic.Bind(touchCommand, true)
+
 		//create the file watcher
 		watcher := fs.Watch(fs.WatchConfig{
 			Path: absDir,
@@ -459,6 +433,58 @@ func addGoStaticBundle(pm *PluginManager) {
 		flux.GoDefer("goStatic:kill", func() {
 			<-c
 			gostatic.Close()
+		})
+	})
+}
+
+func addCommander(pm *PluginManager) {
+	pm.Add("commandWatch", func(config *BuildConfig, options Plugins, c chan bool) {
+		/*Expects to receive a plugin config follow this format
+
+		  tag: dirWatch
+		  config:
+		    path: "./static/less"
+		  args:
+		    - lessc ./static/less/main.less ./static/css/main.css
+		    - lessc ./static/less/svg.less ./static/css/svg.css
+
+		  where the config.path is the path to be watched
+
+		*/
+
+		//get the current directory
+		pwd, _ := os.Getwd()
+
+		//get the dir we should watch
+		dir := options.Config["path"]
+
+		//get the command we should run on change
+		commands := options.Args
+
+		if dir == "" {
+			fmt.Printf("---> dirWatch.error: no path set in config map for plug")
+			return
+		}
+
+		//get the absolute path
+		absDir := filepath.Join(pwd, dir)
+
+		//create the file watcher
+		watcher := fs.Watch(fs.WatchConfig{
+			Path: absDir,
+		})
+
+		watcher.React(flux.SimpleMuxer(func(root flux.Reactor, data interface{}) {
+			if ev, ok := data.(fsnotify.Event); ok {
+				fmt.Printf("--> commandWatch:File as changed: %+s\n", ev.String())
+			}
+		}), true)
+		// create the command runner set to run the args
+		watcher.Bind(builders.CommandLauncher(commands), true)
+
+		flux.GoDefer("CommandWatch:kill", func() {
+			<-c
+			watcher.Close()
 		})
 	})
 }
