@@ -39,6 +39,7 @@ const (
 
 // Message represent a message data
 type Message struct {
+	Queries     url.Values
 	MessageType string
 	Method      string
 	Payload     []byte

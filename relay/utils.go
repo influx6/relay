@@ -51,10 +51,12 @@ func loadData(r *Context) (*Message, error) {
 	msg := Message{}
 	msg.Method = r.Req.Method
 
+	msg.Queries = r.Req.URL.Query()
+
 	content, ok := r.Req.Header["Content-Type"]
 
 	if ok {
-		muxcontent := strings.Join(content, ";")
+		muxcontent := strings.ToLower(strings.Join(content, ";"))
 
 		if strings.Index(muxcontent, "application/x-www-form-urlencode") != -1 {
 			if err := r.Req.ParseForm(); err != nil {
@@ -86,6 +88,8 @@ func loadData(r *Context) (*Message, error) {
 		}
 		msg.Form = r.Req.Form
 		msg.PostForm = r.Req.PostForm
+		//set the type to basic,meaning no body type just requsts and query params
+		msg.MessageType = "basic"
 		return &msg, nil
 	}
 
