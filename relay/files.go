@@ -26,6 +26,33 @@ var mediaTypes = map[string]string{
 	".mp3":      "audio/mp3",
 }
 
+// FS provides a configurable struct that provides a http.FileSystem with extra customization options
+type FS struct {
+	http.FileSystem
+	Strip  string
+	Header http.Header
+}
+
+// UseFS returns a custom http.FileSystem with extra extensions in tailoring response
+func UseFS(fs http.FileSystem, hd http.Header, strip string) *FS {
+	fsm := FS{
+		FileSystem: fs,
+		Strip:      strip,
+		Header:     hd,
+	}
+	return &fsm
+}
+
+// NewFS returns a custom http.FileSystem with extra extensions in tailoring response
+func NewFS(fs http.FileSystem, strip string) *FS {
+	fsm := FS{
+		FileSystem: fs,
+		Strip:      strip,
+		Header:     make(http.Header),
+	}
+	return &fsm
+}
+
 // ServeFile provides a file handler for serving files, it takes an indexFile which defines a default file to look for if the file path is a directory ,then the directory to use and the file to be searched for
 func ServeFile(indexFile, dir, file string, res http.ResponseWriter, req *http.Request) error {
 	fs := http.Dir(dir)
