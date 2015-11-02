@@ -2,8 +2,10 @@ package relay
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -274,6 +276,48 @@ func (r *Routes) Render(to string, res http.ResponseWriter, req *http.Request, c
 	req.URL.Path = newurl
 	req.Method = "GET"
 	r.ServeURL(to, res, req, c)
+}
+
+// ServeFS serves up a http.FileSystem to the request
+func (r *Routes) ServeFS(pattern string, fs http.FileSystem, strip string) {
+	pattern = strings.TrimSuffix(strings.TrimSuffix(pattern, "/*"), "/")
+	strip = path.Clean(fmt.Sprintf("/%s/", strip))
+	r.Add("get head", pattern+"/*", func(res http.ResponseWriter, req *http.Request, c Collector) {
+		requested := reggy.CleanPath(req.URL.Path)
+		file := strings.TrimPrefix(requested, strip)
+
+		fi, err := fs.Open(file)
+		// log.Printf("stat: %s -> %s", file, err)
+
+		if err != nil {
+			r.doFail(res, req, c)
+			return
+		}
+
+		ext := strings.ToLower(filepath.Ext(file))
+
+		stat, err := fi.Stat()
+
+		if err != nil {
+			r.doFail(res, req, c)
+			return
+		}
+
+		// var cext string
+		cext := mime.TypeByExtension(ext)
+
+		// log.Printf("Type ext: %s -> %s", ext, cext)
+		if cext == "" {
+			if types, ok := mediaTypes[ext]; ok {
+				cext = types
+			} else {
+				cext = "text/plain"
+			}
+		}
+
+		res.Header().Set("Content-Type", cext)
+		http.ServeContent(res, req, stat.Name(), stat.ModTime(), fi)
+	})
 }
 
 // ServeDir serves up a directory to the request
