@@ -397,6 +397,10 @@ func addGoStaticBundle(pm *PluginManager) {
 			return
 		}
 
+		gostatic.React(func(root flux.Reactor, err error, data interface{}) {
+			fmt.Printf("--> goStatic.Reacted: State %t Error: (%+s)\n", data, err)
+		}, true)
+
 		//bundle up the assets for the main time
 		gostatic.Send(true)
 
