@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/influx6/reggy"
 )
 
 // ErrNotHTTPParameter is returned when an HTTPort receives a wrong interface type
@@ -133,7 +135,7 @@ func (r *FlatChain) ChainFlat(h FlatHandler) FlatChains {
 
 //ChainHandler returns a new flatchain using a http.Handler as a chain wrap
 func (r *FlatChain) ChainHandler(h http.Handler) FlatChains {
-	fh := FlatHandlerWrap(h, r.log)
+	fh := FlatChainHandlerWrap(h, r.log)
 	r.Chain(fh)
 	return fh
 }
@@ -155,8 +157,8 @@ func ChainFlats(mo FlatChains, so ...FlatChains) FlatChains {
 	return mo
 }
 
-//FlatHandlerWrap provides a chain wrap for http.Handler with an optional log argument
-func FlatHandlerWrap(h http.Handler, lg *log.Logger) FlatChains {
+//FlatChainHandlerWrap provides a chain wrap for http.Handler with an optional log argument
+func FlatChainHandlerWrap(h http.Handler, lg *log.Logger) FlatChains {
 	return NewFlatChain(func(c *Context, nx NextHandler) {
 		h.ServeHTTP(c.Res, c.Req)
 		nx(c)
@@ -169,4 +171,147 @@ func FlatChainWrap(h http.HandlerFunc, lg *log.Logger) FlatChains {
 		h(c.Res, c.Req)
 		nx(c)
 	}, lg)
+}
+
+//FlatHandlerFuncWrap provides a chain wrap for http.Handler with an optional log argument
+func FlatHandlerFuncWrap(h http.HandlerFunc) FlatHandler {
+	return (func(c *Context, nx NextHandler) {
+		h(c.Res, c.Req)
+		nx(c)
+	})
+}
+
+//FlatHandlerWrap provides a chain wrap for http.Handler with an optional log argument
+func FlatHandlerWrap(h http.Handler) FlatHandler {
+	return (func(c *Context, nx NextHandler) {
+		h.ServeHTTP(c.Res, c.Req)
+		nx(c)
+	})
+}
+
+// FlatPass uses FlatRoute but passes on the next caller immediately
+func FlatPass(methods, pattern string, lg *log.Logger) FlatChains {
+	return FlatRoute(methods, pattern, func(c *Context, n NextHandler) { n(c) }, lg)
+}
+
+// FlatHandleHandler returns a flatchain that wraps a http.Handler
+func FlatHandleHandler(methods, pattern string, r http.Handler, lg *log.Logger) FlatChains {
+	return FlatRoute(methods, pattern, FlatHandlerWrap(r), lg)
+}
+
+// FlatHandleFunc returns a FlatChain that wraps a http.HandleFunc for execution
+func FlatHandleFunc(methods, pattern string, r http.HandlerFunc, lg *log.Logger) FlatChains {
+	return FlatRoute(methods, pattern, FlatHandlerFuncWrap(r), lg)
+}
+
+// FlatRoute provides a new routing system based on the middleware stack and if a request matches
+// then its passed down the chain else ignored
+func FlatRoute(methods, pattern string, fx FlatHandler, lg *log.Logger) FlatChains {
+	var rmethods = GetMethods(methods)
+	var rxc = reggy.CreateClassic(pattern)
+
+	return NewFlatChain(func(c *Context, next NextHandler) {
+		req := c.Req
+		method := req.Method
+		url := req.URL.Path
+
+		//ok we have no method restrictions or we have the method,so we can continue else ignore
+		if len(rmethods) == 0 || HasMethod(rmethods, method) {
+
+			ok, param := rxc.Validate(url)
+
+			// not good, so ignore
+			if !ok {
+				return
+			}
+
+			//ok we got a hit, copy over the parameters
+			c.Copy(param)
+
+			//call the handler with the context and next pass
+			fx(c, next)
+		}
+	}, lg)
+}
+
+// ChooseFlat provides a binary operation for handling routing using flatchains,it inspects the requests where
+// if it matches its validation parameters, the `pass` chain is called else calls the 'fail' chain if no match but still passes down the requests through the returned chain
+func ChooseFlat(methods, pattern string, pass, fail FlatChains, lg *log.Logger) FlatChains {
+	var rmethods = GetMethods(methods)
+	var rxc = reggy.CreateClassic(pattern)
+
+	return NewFlatChain(func(c *Context, next NextHandler) {
+		req := c.Req
+		res := c.Res
+		method := req.Method
+		url := req.URL.Path
+
+		//ok we have no method restrictions or we have the method,so we can continue else ignore
+		if len(rmethods) == 0 || HasMethod(rmethods, method) {
+			ok, param := rxc.Validate(url)
+			// not good, so ignore
+			if !ok {
+				fail.Handle(res, req, Collector(param))
+			} else {
+				//ok we got a hit, copy over the parameters
+				pass.Handle(res, req, Collector(param))
+			}
+		}
+		next(c)
+	}, lg)
+}
+
+// ThenFlat provides a binary operation for handling routing using flatchains,it inspects the requests where
+// if it matches the given criteria passes off to the supplied Chain else passes it down its own chain scope
+func ThenFlat(methods, pattern string, pass FlatChains, log *log.Logger) FlatChains {
+	var rmethods = GetMethods(methods)
+	var rxc = reggy.CreateClassic(pattern)
+
+	return NewFlatChain(func(c *Context, next NextHandler) {
+		req := c.Req
+		res := c.Res
+		method := req.Method
+		url := req.URL.Path
+
+		//ok we have no method restrictions or we have the method,so we can continue else ignore
+		if len(rmethods) == 0 || HasMethod(rmethods, method) {
+			ok, param := rxc.Validate(url)
+			// not good, so ignore
+			if ok {
+				//ok we got a hit, copy over the parameters
+				pass.Handle(res, req, Collector(param))
+			} else {
+				c.Copy(param)
+				next(c)
+			}
+		} else {
+			next(c)
+		}
+	}, log)
+}
+
+// PanicFlatHandler returns a new FlatHandler which handles panics which may occure
+func PanicFlatHandler(fx FlatHandler, p PanicHandler) FlatHandler {
+	return func(c *Context, next NextHandler) {
+		defer func() {
+			if err := recover(); err != nil {
+				p(c.Res, c.Req, err)
+			}
+		}()
+
+		fx(c, next)
+	}
+}
+
+// PanicContextHandler returns a new FlatHandler which handles panics which may occure
+func PanicContextHandler(fx FlatHandler, p func(*Context, interface{})) FlatHandler {
+	return func(c *Context, next NextHandler) {
+		defer func() {
+			if err := recover(); err != nil {
+				p(c, err)
+			}
+		}()
+
+		fx(c, next)
+	}
 }

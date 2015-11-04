@@ -4,11 +4,42 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/influx6/flux"
 )
+
+var multispaces = regexp.MustCompile(`\s+`)
+
+// GetMethods turns a string of space separated methods into a list
+func GetMethods(m string) []string {
+	var methods []string
+
+	if m != "" {
+		cln := multispaces.ReplaceAllString(m, " ")
+		methods = multispaces.Split(cln, -1)
+	}
+
+	return methods
+}
+
+// HasMethod returns true/false if a method is found in a list of method names
+func HasMethod(mo []string, m string) bool {
+	var found bool
+	m = strings.ToLower(m)
+
+	for _, mi := range mo {
+		if m != mi {
+			continue
+		}
+		found = true
+		break
+	}
+
+	return found
+}
 
 //IsWebSocketRequest returns true if a http.Request object is based on
 //websocket standards

@@ -11,11 +11,6 @@ import (
 // ErrPatternBound is returned when the pattern is bound
 var ErrPatternBound = errors.New("Pattern is already bound")
 
-var dupgrade = websocket.Upgrader{
-	ReadBufferSize:  1024 * 1024,
-	WriteBufferSize: 1024 * 1024,
-}
-
 // Controller provides a nice overlay on top of the behaviour of a requestlevel
 type Controller struct {
 	*Routes

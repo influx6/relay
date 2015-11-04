@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -300,7 +299,7 @@ func (r *Routes) Render(to string, res http.ResponseWriter, req *http.Request, c
 // ServeFS serves up a http.FileSystem to the request
 func (r *Routes) ServeFS(pattern string, fs *FS) {
 	// pattern = strings.TrimSuffix(pattern, "/*")
-	r.Add("get head", pattern+"/*", FSRouteHandler(fs, r))
+	r.Add("get head", pattern+"/*", FSHandler(fs, r.FailHandler))
 }
 
 // ServeFileSystem serves up a http.FileSystem to the request
@@ -379,8 +378,6 @@ func (r *Routes) ServeFile(pattern, file string) {
 		}
 	})
 }
-
-var multispaces = regexp.MustCompile(`\s+`)
 
 // // AddChain adds a FlatChains into the route for a specific pattern
 // func (r *Routes) AddChain(mo, pattern string, h FlatChains) error {

@@ -12,6 +12,11 @@ import (
 	"github.com/influx6/flux"
 )
 
+var dupgrade = websocket.Upgrader{
+	ReadBufferSize:  1024 * 1024,
+	WriteBufferSize: 1024 * 1024,
+}
+
 // ErrClosed is returned to indicated an already closed struct
 var ErrClosed = errors.New("Already Closed")
 
@@ -247,6 +252,13 @@ type SocketHandler func(*SocketWorker)
 
 // NewSockets returns a new websocket port
 func NewSockets(upgrader *websocket.Upgrader, headers http.Header, hs SocketHandler, logg *log.Logger) FlatChains {
+	if upgrader == nil {
+		//copy over
+		dop := dupgrade
+		//give it the address of the new clone
+		upgrader = &dop
+	}
+
 	return NewFlatChain(func(c *Context, nx NextHandler) {
 
 		if headers != nil {

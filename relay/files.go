@@ -41,22 +41,17 @@ func FSCtxHandler(fs *FS) FlatHandler {
 	return FSContextHandler(fs, nil)
 }
 
-// FSHandler returns a valid Route.RHandler
-func FSHandler(fs *FS) RHandler {
-	return FSRouteHandler(fs, nil)
-}
-
 // FSContextHandler returns a valid FlatHandler
-func FSContextHandler(fs *FS, r *Routes) FlatHandler {
-	fsh := FSRouteHandler(fs, r)
+func FSContextHandler(fs *FS, fail http.HandlerFunc) FlatHandler {
+	fsh := FSHandler(fs, fail)
 	return func(c *Context, next NextHandler) {
 		fsh(c.Res, c.Req, c.c)
 		next(c)
 	}
 }
 
-// FSRouteHandler returns a valid Route.RHandler for use with the relay.Route
-func FSRouteHandler(fs *FS, r *Routes) RHandler {
+// FSHandler returns a valid Route.RHandler for use with the relay.Route
+func FSHandler(fs *FS, fail http.HandlerFunc) RHandler {
 	return func(res http.ResponseWriter, req *http.Request, c Collector) {
 		strip := path.Clean(fmt.Sprintf("/%s/", fs.Strip))
 		requested := reggy.CleanPath(req.URL.Path)
@@ -65,8 +60,8 @@ func FSRouteHandler(fs *FS, r *Routes) RHandler {
 		fi, err := fs.Open(file)
 
 		if err != nil {
-			if r != nil {
-				r.doFail(res, req, c)
+			if fail != nil {
+				fail(res, req)
 			} else {
 				http.NotFound(res, req)
 			}
@@ -78,8 +73,8 @@ func FSRouteHandler(fs *FS, r *Routes) RHandler {
 		stat, err := fi.Stat()
 
 		if err != nil {
-			if r != nil {
-				r.doFail(res, req, c)
+			if fail != nil {
+				fail(res, req)
 			} else {
 				http.NotFound(res, req)
 			}
@@ -108,6 +103,50 @@ func FSRouteHandler(fs *FS, r *Routes) RHandler {
 			}
 		}
 
+		http.ServeContent(res, req, stat.Name(), stat.ModTime(), fi)
+	}
+}
+
+// FSServe provides a http.Handler for serving using a http.FileSystem
+func FSServe(fs http.FileSystem, stripPrefix string, fail http.HandlerFunc) RHandler {
+	if fail == nil {
+		fail = http.NotFound
+	}
+
+	return func(res http.ResponseWriter, req *http.Request, c Collector) {
+		strip := path.Clean(fmt.Sprintf("/%s/", stripPrefix))
+		requested := reggy.CleanPath(req.URL.Path)
+		file := strings.TrimPrefix(requested, strip)
+
+		fi, err := fs.Open(file)
+
+		if err != nil {
+			fail(res, req)
+			return
+		}
+
+		ext := strings.ToLower(filepath.Ext(file))
+
+		stat, err := fi.Stat()
+
+		if err != nil {
+			fail(res, req)
+			return
+		}
+
+		// var cext string
+		cext := mime.TypeByExtension(ext)
+
+		// log.Printf("Type ext: %s -> %s", ext, cext)
+		if cext == "" {
+			if types, ok := mediaTypes[ext]; ok {
+				cext = types
+			} else {
+				cext = "text/plain"
+			}
+		}
+
+		res.Header().Set("Content-Type", cext)
 		http.ServeContent(res, req, stat.Name(), stat.ModTime(), fi)
 	}
 }
