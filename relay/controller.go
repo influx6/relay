@@ -2,6 +2,7 @@ package relay
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -18,6 +19,7 @@ var dupgrade = websocket.Upgrader{
 // Controller provides a nice overlay on top of the behaviour of a requestlevel
 type Controller struct {
 	*Routes
+	Log *log.Logger
 }
 
 // NewController returns a controller with the default config settings
@@ -27,24 +29,32 @@ func NewController(name string) *Controller {
 	}
 }
 
+// NewControllerWith returns a controller with the default config settings, and an optional log for logger through context
+func NewControllerWith(name string, lg *log.Logger) *Controller {
+	return &Controller{
+		Routes: NewRoutes(name),
+		Log:    lg,
+	}
+}
+
 // BindSocket returns provides a handle that turns http requests into websocket requests using relay.socketworkers
 func (c *Controller) BindSocket(mo, pattern string, fx SocketHandler, ho http.Header) FlatChains {
 	do := dupgrade
-	so := NewSockets(&do, ho, fx)
+	so := NewSockets(&do, ho, fx, c.Log)
 	c.Add(mo, pattern, so.Handle)
 	return so
 }
 
 //UpgradeSocket provides a refined control of the arguments passed to the relay.NewSocket provider
 func (c *Controller) UpgradeSocket(mo, pattern string, fx SocketHandler, up websocket.Upgrader, ho http.Header) FlatChains {
-	so := NewSockets(&up, ho, fx)
+	so := NewSockets(&up, ho, fx, c.Log)
 	c.Add(mo, pattern, so.Handle)
 	return so
 }
 
 // BindHTTP binds a pattern/route to a websocket port and registers that into the controllers router, requiring the supply of a codec for handling encoding/decoding process but if not supplied uses a default http codec
 func (c *Controller) BindHTTP(mo, pattern string, fx FlatHandler) FlatChains {
-	hs := NewFlatChain(fx)
+	hs := NewFlatChain(fx, c.Log)
 	c.Add(mo, pattern, hs.Handle)
 	return hs
 }

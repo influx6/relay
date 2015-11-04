@@ -194,6 +194,10 @@ func addJSWatchBuild(pm *PluginManager) {
 			PackageDir: clientdir,
 		})
 
+		jsbuild.React(func(root flux.Reactor, err error, _ interface{}) {
+			fmt.Printf("--> Js.client.Build complete: Dir: %s \n -----> Error: %s \n", clientdir, err)
+		}, true)
+
 		fmt.Printf("--> Initializing File Watcher using js package dependecies at %d\n", len(packages))
 
 		watcher := fs.WatchSet(fs.WatchSetConfig{
@@ -240,9 +244,7 @@ func addJSWatchBuild(pm *PluginManager) {
 			watcher.Close()
 			jsbuild.Close()
 		})
-
 	})
-
 }
 
 func addGoFriday(pm *PluginManager) {

@@ -28,7 +28,7 @@ import (
 func main() {
 
 	server := engine.NewEngine(engine.NewConfig(), func(app *engine.Engine) {
-
+		
 		app.ServeDir("/static/*", app.Static.Dir, app.Static.StripPrefix)
 
 	})

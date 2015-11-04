@@ -3,6 +3,7 @@ package relay
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -245,7 +246,7 @@ func (s *SocketHub) manageSocket(ws *SocketWorker) {
 type SocketHandler func(*SocketWorker)
 
 // NewSockets returns a new websocket port
-func NewSockets(upgrader *websocket.Upgrader, headers http.Header, hs SocketHandler) FlatChains {
+func NewSockets(upgrader *websocket.Upgrader, headers http.Header, hs SocketHandler, logg *log.Logger) FlatChains {
 	return NewFlatChain(func(c *Context, nx NextHandler) {
 
 		if headers != nil {
@@ -272,5 +273,5 @@ func NewSockets(upgrader *websocket.Upgrader, headers http.Header, hs SocketHand
 			}))
 			nx(c)
 		})
-	})
+	}, logg)
 }

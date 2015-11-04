@@ -2,7 +2,9 @@ package relay
 
 import (
 	"errors"
+	"log"
 	"net/http"
+	"os"
 )
 
 // ErrNotHTTPParameter is returned when an HTTPort receives a wrong interface type
@@ -14,15 +16,26 @@ type Context struct {
 	*SyncCollector
 	Req *http.Request
 	Res ResponseWriter
+	Log *log.Logger
 	// sock *SocketWorker
 }
 
 // NewContext returns a new http context
 func NewContext(res http.ResponseWriter, req *http.Request) *Context {
+	return NewContextWith(res, req, nil)
+}
+
+// NewContextWith returns a new http context with a custom logger
+func NewContextWith(res http.ResponseWriter, req *http.Request, loga *log.Logger) *Context {
+	if loga == nil {
+		loga = log.New(os.Stdout, "[Relay] ", 0)
+	}
+
 	cx := Context{
 		SyncCollector: NewSyncCollector(),
 		Req:           req,
 		Res:           NewResponseWriter(res),
+		Log:           loga,
 	}
 	return &cx
 }
@@ -31,6 +44,7 @@ func NewContext(res http.ResponseWriter, req *http.Request) *Context {
 type FlatChains interface {
 	ChainHandleFunc(h http.HandlerFunc) FlatChains
 	ChainHandler(h http.Handler) FlatChains
+	ChainFlat(h FlatHandler) FlatChains
 	ServeHTTP(http.ResponseWriter, *http.Request)
 	Handle(http.ResponseWriter, *http.Request, Collector)
 	HandleContext(*Context)
@@ -48,19 +62,21 @@ type FlatHandler func(*Context, NextHandler)
 type FlatChain struct {
 	op   FlatHandler
 	next FlatChains
+	log  *log.Logger
 }
 
 //FlatChainIdentity returns a chain that calls the next automatically
-func FlatChainIdentity() FlatChains {
+func FlatChainIdentity(lg *log.Logger) FlatChains {
 	return NewFlatChain(func(c *Context, nx NextHandler) {
 		nx(c)
-	})
+	}, lg)
 }
 
 //NewFlatChain returns a new flatchain instance
-func NewFlatChain(fx FlatHandler) *FlatChain {
+func NewFlatChain(fx FlatHandler, loga *log.Logger) *FlatChain {
 	return &FlatChain{
-		op: fx,
+		op:  fx,
+		log: loga,
 	}
 }
 
@@ -86,16 +102,12 @@ func (r *FlatChain) NChain(rx FlatChains) FlatChains {
 
 // HandleContext calls the next chain if any
 func (r *FlatChain) HandleContext(c *Context) {
-	r.op(c, func(c *Context) {
-		if r.next != nil {
-			r.next.HandleContext(c)
-		}
-	})
+	r.op(c, r.handleNext)
 }
 
 // Handle calls the next chain if any
 func (r *FlatChain) Handle(res http.ResponseWriter, req *http.Request, co Collector) {
-	c := NewContext(res, req)
+	c := NewContextWith(res, req, r.log)
 	c.Copy(co)
 	r.HandleContext(c)
 }
@@ -107,16 +119,30 @@ func (r *FlatChain) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 //ChainHandleFunc returns a new flatchain using a http.HandlerFunc as a chain wrap
 func (r *FlatChain) ChainHandleFunc(h http.HandlerFunc) FlatChains {
-	fh := FlatChainWrap(h)
+	fh := FlatChainWrap(h, r.log)
+	r.Chain(fh)
+	return fh
+}
+
+//ChainFlat returns a new flatchain using a provided FlatHandler
+func (r *FlatChain) ChainFlat(h FlatHandler) FlatChains {
+	fh := NewFlatChain(h, r.log)
 	r.Chain(fh)
 	return fh
 }
 
 //ChainHandler returns a new flatchain using a http.Handler as a chain wrap
 func (r *FlatChain) ChainHandler(h http.Handler) FlatChains {
-	fh := FlatHandlerWrap(h)
+	fh := FlatHandlerWrap(h, r.log)
 	r.Chain(fh)
 	return fh
+}
+
+// handleNext calls the next chain in the link if available
+func (r *FlatChain) handleNext(c *Context) {
+	if r.next != nil {
+		r.next.HandleContext(c)
+	}
 }
 
 //ChainFlats chains second flats to the first flatchain and returns the first flatchain
@@ -129,18 +155,18 @@ func ChainFlats(mo FlatChains, so ...FlatChains) FlatChains {
 	return mo
 }
 
-//FlatHandlerWrap provides a chain wrap for http.Handler
-func FlatHandlerWrap(h http.Handler) FlatChains {
+//FlatHandlerWrap provides a chain wrap for http.Handler with an optional log argument
+func FlatHandlerWrap(h http.Handler, lg *log.Logger) FlatChains {
 	return NewFlatChain(func(c *Context, nx NextHandler) {
 		h.ServeHTTP(c.Res, c.Req)
 		nx(c)
-	})
+	}, lg)
 }
 
-//FlatChainWrap provides a chain wrap for http.Handler
-func FlatChainWrap(h http.HandlerFunc) FlatChains {
+//FlatChainWrap provides a chain wrap for http.Handler with an optional log argument
+func FlatChainWrap(h http.HandlerFunc, lg *log.Logger) FlatChains {
 	return NewFlatChain(func(c *Context, nx NextHandler) {
 		h(c.Res, c.Req)
 		nx(c)
-	})
+	}, lg)
 }

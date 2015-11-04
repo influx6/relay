@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
+	"path"
 	filepath "path/filepath"
 	"strings"
+
+	"github.com/influx6/reggy"
 )
 
 var mediaTypes = map[string]string{
@@ -31,6 +34,82 @@ type FS struct {
 	http.FileSystem
 	Strip  string
 	Header http.Header
+}
+
+// FSCtxHandler returns a valid FlatHandler
+func FSCtxHandler(fs *FS) FlatHandler {
+	return FSContextHandler(fs, nil)
+}
+
+// FSHandler returns a valid Route.RHandler
+func FSHandler(fs *FS) RHandler {
+	return FSRouteHandler(fs, nil)
+}
+
+// FSContextHandler returns a valid FlatHandler
+func FSContextHandler(fs *FS, r *Routes) FlatHandler {
+	fsh := FSRouteHandler(fs, r)
+	return func(c *Context, next NextHandler) {
+		fsh(c.Res, c.Req, c.c)
+		next(c)
+	}
+}
+
+// FSRouteHandler returns a valid Route.RHandler for use with the relay.Route
+func FSRouteHandler(fs *FS, r *Routes) RHandler {
+	return func(res http.ResponseWriter, req *http.Request, c Collector) {
+		strip := path.Clean(fmt.Sprintf("/%s/", fs.Strip))
+		requested := reggy.CleanPath(req.URL.Path)
+		file := strings.TrimPrefix(requested, strip)
+
+		fi, err := fs.Open(file)
+
+		if err != nil {
+			if r != nil {
+				r.doFail(res, req, c)
+			} else {
+				http.NotFound(res, req)
+			}
+			return
+		}
+
+		ext := strings.ToLower(filepath.Ext(file))
+
+		stat, err := fi.Stat()
+
+		if err != nil {
+			if r != nil {
+				r.doFail(res, req, c)
+			} else {
+				http.NotFound(res, req)
+			}
+			return
+		}
+
+		// var cext string
+		cext := mime.TypeByExtension(ext)
+
+		// log.Printf("Type ext: %s -> %s", ext, cext)
+		if cext == "" {
+			if types, ok := mediaTypes[ext]; ok {
+				cext = types
+			} else {
+				cext = "text/plain"
+			}
+		}
+
+		res.Header().Set("Content-Type", cext)
+
+		if fs.Header != nil {
+			for m, v := range fs.Header {
+				for _, va := range v {
+					res.Header().Add(m, va)
+				}
+			}
+		}
+
+		http.ServeContent(res, req, stat.Name(), stat.ModTime(), fi)
+	}
 }
 
 // UseFS returns a custom http.FileSystem with extra extensions in tailoring response

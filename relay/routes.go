@@ -86,11 +86,11 @@ func NewRoutes(ns string) *Routes {
 
 //BuildRoutes returns a new Routes instance
 func BuildRoutes(ns string, failed http.HandlerFunc, panic PanicHandler) *Routes {
-	if failed == nil {
-		failed = func(res http.ResponseWriter, req *http.Request) {
-
-		}
-	}
+	// if failed == nil {
+	// 	failed = func(res http.ResponseWriter, req *http.Request) {
+	//
+	// 	}
+	// }
 
 	rs := Routes{
 		namespace:    ns,
@@ -172,7 +172,6 @@ func (r *Routes) ServeURL(ro string, res http.ResponseWriter, req *http.Request,
 				r.wrap(no, res, req, col)
 				// break
 				return nil
-
 			}
 		}
 
@@ -211,9 +210,29 @@ func (r *Routes) RouteHEAD(pattern string, h Routable) {
 	r.Add("head", pattern, h.Handle)
 }
 
+// RouteOPEN sets the handler to only requests of 'get' or 'head' methods
+func (r *Routes) RouteOPEN(pattern string, h Routable) {
+	r.Add("get head", pattern, h.Handle)
+}
+
+// RouteAny sets the handler to only requests of 'get' or 'head' methods and the subparts of the pattern
+func (r *Routes) RouteAny(pattern string, h Routable) {
+	r.Add("get head", pattern+"/*", h.Handle)
+}
+
 // RouteGET sets the handler to only requests of this method
 func (r *Routes) RouteGET(pattern string, h Routable) {
 	r.Add("get", pattern, h.Handle)
+}
+
+// Any sets the handler to handle 'get' or 'head' methods for the specific route pattern and its sub-parts
+func (r *Routes) Any(pattern string, h RHandler) {
+	r.Add("get head", pattern+"/*", h)
+}
+
+// OPEN sets the handler to handle 'get' or 'head' methods
+func (r *Routes) OPEN(pattern string, h RHandler) {
+	r.Add("get head", pattern, h)
 }
 
 // OPTIONS sets the handler to only requests of this method
@@ -280,59 +299,15 @@ func (r *Routes) Render(to string, res http.ResponseWriter, req *http.Request, c
 
 // ServeFS serves up a http.FileSystem to the request
 func (r *Routes) ServeFS(pattern string, fs *FS) {
-	pattern = strings.TrimSuffix(strings.TrimSuffix(pattern, "/*"), "/")
-	strip := path.Clean(fmt.Sprintf("/%s/", fs.Strip))
-	r.Add("get head", pattern+"/*", func(res http.ResponseWriter, req *http.Request, c Collector) {
-		requested := reggy.CleanPath(req.URL.Path)
-		file := strings.TrimPrefix(requested, strip)
-
-		fi, err := fs.Open(file)
-
-		if err != nil {
-			r.doFail(res, req, c)
-			return
-		}
-
-		ext := strings.ToLower(filepath.Ext(file))
-
-		stat, err := fi.Stat()
-
-		if err != nil {
-			r.doFail(res, req, c)
-			return
-		}
-
-		// var cext string
-		cext := mime.TypeByExtension(ext)
-
-		// log.Printf("Type ext: %s -> %s", ext, cext)
-		if cext == "" {
-			if types, ok := mediaTypes[ext]; ok {
-				cext = types
-			} else {
-				cext = "text/plain"
-			}
-		}
-
-		res.Header().Set("Content-Type", cext)
-
-		if fs.Header != nil {
-			for m, v := range fs.Header {
-				for _, va := range v {
-					res.Header().Add(m, va)
-				}
-			}
-		}
-
-		http.ServeContent(res, req, stat.Name(), stat.ModTime(), fi)
-	})
+	// pattern = strings.TrimSuffix(pattern, "/*")
+	r.Add("get head", pattern+"/*", FSRouteHandler(fs, r))
 }
 
 // ServeFileSystem serves up a http.FileSystem to the request
-func (r *Routes) ServeFileSystem(pattern string, fs http.FileSystem, strip string) {
-	pattern = strings.TrimSuffix(strings.TrimSuffix(pattern, "/*"), "/")
-	strip = path.Clean(fmt.Sprintf("/%s/", strip))
+func (r *Routes) ServeFileSystem(pattern string, fs http.FileSystem, stripPrefix string) {
+	// pattern = strings.TrimSuffix(pattern, "/*")
 	r.Add("get head", pattern+"/*", func(res http.ResponseWriter, req *http.Request, c Collector) {
+		strip := path.Clean(fmt.Sprintf("/%s/", stripPrefix))
 		requested := reggy.CleanPath(req.URL.Path)
 		file := strings.TrimPrefix(requested, strip)
 
@@ -370,10 +345,10 @@ func (r *Routes) ServeFileSystem(pattern string, fs http.FileSystem, strip strin
 }
 
 // ServeDir serves up a directory to the request
-func (r *Routes) ServeDir(pattern, dir, strip string) {
-	pattern = strings.TrimSuffix(strings.TrimSuffix(pattern, "/*"), "/")
-	strip = path.Clean(fmt.Sprintf("/%s/", strip))
+func (r *Routes) ServeDir(pattern, dir, stripPrefix string) {
+	// pattern = strings.TrimSuffix(pattern, "/*")
 	r.Add("get head", pattern+"/*", func(res http.ResponseWriter, req *http.Request, c Collector) {
+		strip := path.Clean(fmt.Sprintf("/%s/", stripPrefix))
 		requested := reggy.CleanPath(req.URL.Path)
 		file := strings.TrimPrefix(requested, strip)
 
@@ -406,6 +381,11 @@ func (r *Routes) ServeFile(pattern, file string) {
 }
 
 var multispaces = regexp.MustCompile(`\s+`)
+
+// // AddChain adds a FlatChains into the route for a specific pattern
+// func (r *Routes) AddChain(mo, pattern string, h FlatChains) error {
+// 	return r.Add(mo,pattern,h.H)
+// }
 
 // Add adds a route into the sets of routes, method can be "" to allow all methods to be handled or a stringed range eg "get head put" to allow this range of methods(get,head,put) only for the handler
 func (r *Routes) Add(mo, pattern string, h RHandler) error {
