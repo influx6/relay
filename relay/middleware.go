@@ -207,18 +207,20 @@ func FlatHandleFunc(methods, pattern string, r http.HandlerFunc, lg *log.Logger)
 // FlatRoute provides a new routing system based on the middleware stack and if a request matches
 // then its passed down the chain else ignored
 func FlatRoute(methods, pattern string, fx FlatHandler, lg *log.Logger) FlatChains {
-	var rmethods = GetMethods(methods)
-	var rxc = reggy.CreateClassic(pattern)
+	return FlatRouteBuild(GetMethods(methods), reggy.CreateClassic(pattern), fx, lg)
+}
 
+// FlatRouteBuild lets you control what methods and matcher gets used to create a flatchain
+func FlatRouteBuild(methods []string, pattern *reggy.ClassicMatchMux, fx FlatHandler, lg *log.Logger) FlatChains {
 	return NewFlatChain(func(c *Context, next NextHandler) {
 		req := c.Req
 		method := req.Method
 		url := req.URL.Path
 
 		//ok we have no method restrictions or we have the method,so we can continue else ignore
-		if len(rmethods) == 0 || HasMethod(rmethods, method) {
+		if len(methods) == 0 || HasMethod(methods, method) {
 
-			ok, param := rxc.Validate(url)
+			ok, param := pattern.Validate(url)
 
 			// not good, so ignore
 			if !ok {

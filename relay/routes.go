@@ -85,12 +85,6 @@ func NewRoutes(ns string) *Routes {
 
 //BuildRoutes returns a new Routes instance
 func BuildRoutes(ns string, failed http.HandlerFunc, panic PanicHandler) *Routes {
-	// if failed == nil {
-	// 	failed = func(res http.ResponseWriter, req *http.Request) {
-	//
-	// 	}
-	// }
-
 	rs := Routes{
 		namespace:    ns,
 		routes:       make(map[string]*Route),
@@ -378,11 +372,6 @@ func (r *Routes) ServeFile(pattern, file string) {
 		}
 	})
 }
-
-// // AddChain adds a FlatChains into the route for a specific pattern
-// func (r *Routes) AddChain(mo, pattern string, h FlatChains) error {
-// 	return r.Add(mo,pattern,h.H)
-// }
 
 // Add adds a route into the sets of routes, method can be "" to allow all methods to be handled or a stringed range eg "get head put" to allow this range of methods(get,head,put) only for the handler
 func (r *Routes) Add(mo, pattern string, h RHandler) error {
