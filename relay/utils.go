@@ -11,6 +11,23 @@ import (
 	"github.com/influx6/flux"
 )
 
+// BuildMatchesMethod returns RHandler which matches the methods of a request to a list of accepted methods
+// to decided wether to run a RHandler function
+func BuildMatchesMethod(mo []string, fx RHandler) RHandler {
+	return func(w http.ResponseWriter, r *http.Request, c Collector) {
+		MatchesMethod(mo, w, r, c, fx)
+	}
+}
+
+// MatchesMethod provides a factory function for matching sets of methods against a reqests method
+func MatchesMethod(mo []string, w http.ResponseWriter, r *http.Request, c Collector, fx RHandler) {
+	method := strings.ToLower(r.Method)
+	//ok we have no method restrictions or we have the method,so we can continue else ignore
+	if len(mo) == 0 || HasMethod(mo, method) {
+		fx(w, r, c)
+	}
+}
+
 var multispaces = regexp.MustCompile(`\s+`)
 
 // GetMethods turns a string of space separated methods into a list
