@@ -250,6 +250,11 @@ func (s *SocketHub) manageSocket(ws *SocketWorker) {
 //SocketHandler provides an handler type without the port option
 type SocketHandler func(*SocketWorker)
 
+// FlatSocket returns a socket Chain using a default upgraders
+func FlatSocket(header http.Header, hs SocketHandler, logg *log.Logger) FlatChains {
+	return NewSockets(nil, header, hs, logg)
+}
+
 // NewSockets returns a new websocket port
 func NewSockets(upgrader *websocket.Upgrader, headers http.Header, hs SocketHandler, logg *log.Logger) FlatChains {
 	if upgrader == nil {

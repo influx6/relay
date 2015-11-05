@@ -49,54 +49,28 @@ Relay is a simple microframework with very simple designs that provide you with 
 
   	app := engine.NewEngine(conf)
 
-    //ServeDir serves a directory and ripps out the given path strip if supplied
-  	app.ServeDir("/assets", app.Folders.Assets, "/assets/")
+    app.Chain(relay.Logger(nil))
 
-    //basic controller
-
-    home := relay.NewController("/home")
-    app.Bind(home)
+    //using the middleware router
+		app.Rule("get head", "/favicon.ico", nil).Chain(relay.Redirect("/static/images/favicon.ico"))
 
     //the internal router allows the specification of
     //request methods to handle  for this route as a list of space seperated values
-    app.Add("get head delete","/jails",func(res http.ResponseWriter,req *http.Request,params relay.Collector){
+    app.Rule("get head delete","/jails",func(c *relay.Context,next relay.NextHandler){
       //handle the request and response
     })
 
     //if its an empty string then all methods are allowed
-    app.Add("","/updates",func(res http.ResponseWriter,req *http.Request,params relay.Collector){
+    app.Rule("","/updates",func(c *relay.Context,next relay.NextHandler){
       //handle the request and response
     })
 
     // Using Codecs
     //if its an empty string then all methods are allowed
-    app.Add("","/updates",func(res http.ResponseWriter,req *http.Request,params relay.Collector){
+    app.Rule("","/updates",func(c *relay.Context,next relay.NextHandler){
       //handle the request and response
     })
 
-    // Using the BindHTTP and BindSocket/UpgradeSocket provide custom handlers that use relays Context
-    // and SocketWorker structs respectively allow a more refined and simple api call but also included
-    //with context is an internal map to localize request data for easy access instead of a global map
-    //of requests
-
-    home.BindHTTP("get post put","/:id",func(req *relay.Context){
-      //...handle the custom request object
-      msg, err := BasicHTTPCodec.Deocde(req)
-      //use the msg to get Params, Body or ParseForm/Form depending
-      //on the content type of request (www-urlencode, multipart,body)
-    }) // => returns a flatchain middleware
-
-    //you can also use the pure go-handler approach
-    home.Get("/updates",func(res http.ResponseWriter,req *http.Request,params relay.Collector){
-      //handle the request and response
-    })
-
-    //for a more refined and simpler handler using the relay.Context struct which includes
-    //a sync map for storing request data forthe lifetime of the requests
-    home.BindHTTP("get post put","/:names",func(req *relay.Context,nx relay.NextHandler){
-      //handle the custom request object
-      nx(req)
-    }) // => returns a FlatChain middleware
 
     ```
 
@@ -104,7 +78,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
     ```go
 
-        home.BindHTTP("get post put","/:names",func(c *relay.Context,nx relay.NextHandler){
+        app.Rule("get post put","/:names",func(c *relay.Context,nx relay.NextHandler){
           //handle the custom request object
             json := JSONRender(200,map[string]string{"user":"john"}, true, true, true)
 
@@ -118,49 +92,12 @@ Relay is a simple microframework with very simple designs that provide you with 
 
     ```
 
-    - Using the middleware system in relay
-
-    ```go
-
-      // BindHTTP returns a middleware capable of providing stacking abilities
-      home.BindHTTP("get post put","/:names",func(req *relay.Context,nx relay.NextHandler){
-        //handle the custom request object
-        nx(req)
-      }).Chain(func(c *relay.Context,nx relay.NextHandler){
-        //do something here...
-        nx(c)
-      })
-
-      var Logger = NewFlatChain(func(c *relay.Context,next relay.NextHandler){
-        log.Printf("Request: Method %s to %s",c.Req.Method,c.Req.URI.path)
-        next(c)
-      })
-
-      home.Add("get post put","/:user",Logger.Handle)
-
-      //continue chaining from that middleware
-      Logger.Chain(func(c *relay.Context,nx relay.NextHandler){
-        //do something here...
-        nx(c)
-      })
-    ```
-
     - Using websockets:
 
     ```go
 
-    //Binding for websocket connections exists and each controller provides
-    //the BindSocket and BindSocketFor where each allows a more refined control on arguments.
-    //Relay provides two strategies when dealing with websocket connections:
-
-    //Strateg one: (handling socket messages directly)
-    //With websocket is the SocketWorker which encapsulates
-    //the gorilla.WebSocket object and create a infinite buffer
-    //where messages are received until you begin to handle them
-    //by receiving from the message channel
-    //which returns a relay.WebsocketMessage type.
-    //the handler is sent into a go-routine,so worry not of blockage ;)
-    home.BindSocket("get post put","/socket",func(soc *relay.SocketWorker){
+    //use Link() to branch out into a new chain tree
+    app.Rule("get post put","/socket").Link(relay.FlatSocket(nil,func(soc *relay.SocketWorker){
 
       for data := range soc.Messages {
 
@@ -181,7 +118,7 @@ Relay is a simple microframework with very simple designs that provide you with 
       }
 
 
-    },nil) // => returns a FlatChain middleware
+    },nil)) // => returns a FlatChain middleware
 
     //Strategy two:
     //for a more chat like experience use for websocket, apart
@@ -209,21 +146,7 @@ Relay is a simple microframework with very simple designs that provide you with 
 
     })
 
-    home.BindSocket("get post put","/socket",hub.AddConnection,nil) // => returns a http middleware
-
-    //BindSocketFor provides more control of what headers the socket uses,
-    //the upgrade settings needed apart from the usual path,
-    //request method and handler to use
-    home.UpgradeSocket("","/socket",func(soc *relay.SocketWorker){
-      //...
-    },websocket.Upgrader{
-    	ReadBufferSize:  1024,
-    	WriteBufferSize: 1024,
-    },http.Header(map[string][]string{
-    	"Access-Control-Allow-Credentials": []string{"true"},
-    	"Access-Control-Allow-Origin":      []string{"*"},
-    })) //returns a FlatChains middleware
-
+    app.Rule("get post put","/socket",nil).Link(relay.FlatSocket(nil,hub.AddConnection,nil))
 
   	app.Serve()
   ```

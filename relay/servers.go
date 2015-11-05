@@ -17,23 +17,23 @@ type (
 )
 
 var (
-	//ErrTimeout provides a timeout error
+	// ErrTimeout provides a timeout error
 	ErrTimeout = errors.New("Timeout on Connection")
-	//threshold returns a chan of time
+	// threshold returns a chan of time
 	threshold = func(ds time.Duration) <-chan time.Time {
 		return time.After(ds)
 	}
-	//ErrorNotFind stands for errors when value not find
+	// ErrorNotFind stands for errors when value not find
 	ErrorNotFind = errors.New("NotFound!")
-	//ErrorBadRequestType stands for errors when the interface{} recieved can not
-	//be type asserted as a *http.Request object
+	// ErrorBadRequestType stands for errors when the interface{} recieved can not
+	// be type asserted as a *http.Request object
 	ErrorBadRequestType = errors.New("type is not a *http.Request")
-	//ErrorBadHTTPPacketType stands for errors when the interface{} received is not a
+	// ErrorBadHTTPPacketType stands for errors when the interface{} received is not a
 	//bad request type
 	ErrorBadHTTPPacketType = errors.New("type is not a HTTPPacket")
-	//ErrorNoConnection describe when a link connection does not exists"
+	// ErrorNoConnection describe when a link connection does not exists"
 	ErrorNoConnection = errors.New("NoConnection")
-	//ErrBadConn represent a bad connection
+	// ErrBadConn represent a bad connection
 	ErrBadConn = errors.New("Bad Connection Received")
 )
 

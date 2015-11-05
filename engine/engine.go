@@ -143,7 +143,7 @@ func (c *Config) Load(file string) error {
 
 //Engine provides a base luncher for a service
 type Engine struct {
-	*relay.Routes
+	*relay.ChainRouter
 	*Config
 	// li              *graceful.Server
 	ls        net.Listener
@@ -165,10 +165,10 @@ type Engine struct {
 //NewEngine returns a new app configuration
 func NewEngine(c *Config, init func(*Engine)) *Engine {
 	eo := &Engine{
-		Config:   c,
-		Routes:   relay.NewRoutes(""),
-		Template: assets.NewTemplateDir(&c.TemplatesConfig),
-		OnInit:   init,
+		Config:      c,
+		ChainRouter: relay.NewChainRouter(nil, nil),
+		Template:    assets.NewTemplateDir(&c.TemplatesConfig),
+		OnInit:      init,
 	}
 
 	eo.stop = makeDuration(c.Killbeat, 20)

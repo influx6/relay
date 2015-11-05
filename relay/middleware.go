@@ -67,6 +67,11 @@ type FlatChain struct {
 	log  *log.Logger
 }
 
+// IdentityCall provides a Identity caller for FlatHandler
+func IdentityCall(c *Context, nx NextHandler) {
+	nx(c)
+}
+
 //FlatChainIdentity returns a chain that calls the next automatically
 func FlatChainIdentity(lg *log.Logger) FlatChains {
 	return NewFlatChain(func(c *Context, nx NextHandler) {
@@ -80,6 +85,14 @@ func NewFlatChain(fx FlatHandler, loga *log.Logger) *FlatChain {
 		op:  fx,
 		log: loga,
 	}
+}
+
+// Link connects a new FlatChain but bounds it as a new unique chain and not part of the current chain of the FlatChain being connected to
+func (r *FlatChain) Link(rx FlatChains) FlatChains {
+	return r.Chain(NewFlatChain(func(c *Context, next NextHandler) {
+		rx.HandleContext(c)
+		next(c)
+	}, r.log))
 }
 
 // Chain sets the next flat chains else passes it down to the last chain to set as next chain,returning itself
@@ -123,6 +136,20 @@ func (r *FlatChain) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 func (r *FlatChain) ChainHandleFunc(h http.HandlerFunc) FlatChains {
 	fh := FlatChainWrap(h, r.log)
 	r.Chain(fh)
+	return fh
+}
+
+//LinkHandleFunc returns a new flatchain using a http.HandlerFunc as a chain wrap
+func (r *FlatChain) LinkHandleFunc(h http.HandlerFunc) FlatChains {
+	fh := FlatChainWrap(h, r.log)
+	r.Link(fh)
+	return fh
+}
+
+//LinkFlat returns a new flatchain using a provided FlatHandler
+func (r *FlatChain) LinkFlat(h FlatHandler) FlatChains {
+	fh := NewFlatChain(h, r.log)
+	r.Link(fh)
 	return fh
 }
 

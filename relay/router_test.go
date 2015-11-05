@@ -5,14 +5,12 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"github.com/influx6/flux"
 )
 
 func BenchmarkRouter(t *testing.B) {
 	t.ResetTimer()
 	for i := 0; i < t.N; i++ {
-		router := NewRoutes("")
+		router := NewChainRouter(nil, nil)
 
 		req, _ := http.NewRequest("GET", "http://localhost:3000/boo/bat", nil)
 
@@ -28,35 +26,35 @@ func BenchmarkRouter(t *testing.B) {
 
 		req7, _ := http.NewRequest("HEAD", "http://localhost:3000/boo/4", nil)
 
-		router.GET("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		router.Rule("get", "/boo/:id", func(c *Context, next NextHandler) {
 			time.Sleep(20 * time.Millisecond)
 		})
 
-		router.POST("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		router.Rule("post", "/boo/:id", func(c *Context, next NextHandler) {
 			time.Sleep(20 * time.Millisecond)
 		})
 
-		router.PUT("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		router.Rule("patch", "/boo/:id", func(c *Context, next NextHandler) {
 			time.Sleep(20 * time.Millisecond)
 		})
 
-		router.PATCH("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		router.Rule("delete", "/boo/:id", func(c *Context, next NextHandler) {
 			time.Sleep(20 * time.Millisecond)
 		})
 
-		router.DELETE("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		router.Rule("option", "/boo/:id", func(c *Context, next NextHandler) {
 			time.Sleep(20 * time.Millisecond)
 		})
 
-		router.OPTIONS("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		router.Rule("put", "/boo/:id", func(c *Context, next NextHandler) {
 			time.Sleep(20 * time.Millisecond)
 		})
 
-		router.HEAD(`/header/{id:[\d+]}`, func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		router.Rule("head", `/header/{id:[\d+]}`, func(c *Context, next NextHandler) {
 			time.Sleep(20 * time.Millisecond)
 		})
 
-		router.Add("get head  connect", "/goo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
+		router.Rule("get head  connect", "/goo/:id", func(c *Context, next NextHandler) {
 			time.Sleep(20 * time.Millisecond)
 		})
 
@@ -72,7 +70,7 @@ func BenchmarkRouter(t *testing.B) {
 }
 
 func TestRouter(t *testing.T) {
-	router := NewRoutes("")
+	router := NewChainRouter(nil, nil)
 
 	req, _ := http.NewRequest("GET", "http://localhost:3000/boo/bat", nil)
 
@@ -88,36 +86,36 @@ func TestRouter(t *testing.T) {
 
 	req7, _ := http.NewRequest("HEAD", "http://localhost:3000/boo/4", nil)
 
-	router.GET("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
-		expect(t, ps.Get("id"), "bat")
+	router.Rule("bat", "/boo/:id", func(c *Context, next NextHandler) {
+		expect(t, c.Get("id"), "bat")
 	})
 
-	router.POST("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
-		expect(t, ps.Get("id"), "post")
+	router.Rule("post", "/boo/:id", func(c *Context, next NextHandler) {
+		expect(t, c.Get("id"), "post")
 	})
 
-	router.PUT("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
-		expect(t, ps.Get("id"), "put")
+	router.Rule("put", "/boo/:id", func(c *Context, next NextHandler) {
+		expect(t, c.Get("id"), "put")
 	})
 
-	router.PATCH("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
-		expect(t, ps.Get("id"), "patch")
+	router.Rule("patch", "/boo/:id", func(c *Context, next NextHandler) {
+		expect(t, c.Get("id"), "patch")
 	})
 
-	router.DELETE("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
-		expect(t, ps.Get("id"), "delete")
+	router.Rule("delete", "/boo/:id", func(c *Context, next NextHandler) {
+		expect(t, c.Get("id"), "delete")
 	})
 
-	router.OPTIONS("/boo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
-		expect(t, ps.Get("id"), "options")
+	router.Rule("option", "/boo/:id", func(c *Context, next NextHandler) {
+		expect(t, c.Get("id"), "options")
 	})
 
-	router.HEAD(`/header/{id:[\d+]}`, func(res http.ResponseWriter, req *http.Request, ps Collector) {
-		expect(t, ps.Get("id"), 4)
+	router.Rule("head", `/header/{id:[\d+]}`, func(c *Context, next NextHandler) {
+		expect(t, c.Get("id"), 4)
 	})
 
-	router.Add("get head  connect", "/goo/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
-		// expect(t, ps.Get("id"), "options")
+	router.Rule("get head  connect", "/goo/:id", func(c *Context, next NextHandler) {
+		// expect(t, c.Get("id"), "options")
 	})
 
 	rec := httptest.NewRecorder()
@@ -128,29 +126,4 @@ func TestRouter(t *testing.T) {
 	router.ServeHTTP(rec, req5)
 	router.ServeHTTP(rec, req6)
 	router.ServeHTTP(rec, req7)
-}
-
-func TestBindRouter(t *testing.T) {
-	router := NewRoutes("")
-
-	rs := NewRoutes("/boo")
-
-	if rs.Namespace() != "/boo/*" {
-		flux.FatalFailed(t, "expected router namespace to end with '/*'", rs.Namespace())
-	}
-
-	err := router.Bind(rs)
-
-	if err != nil {
-		flux.FatalFailed(t, "Unable to bind routers: %s", err.Error())
-	}
-
-	rs.GET("/:id", func(res http.ResponseWriter, req *http.Request, ps Collector) {
-		expect(t, ps.Get("id"), "bat")
-	})
-
-	req, _ := http.NewRequest("GET", "http://localhost:3000/boo/bat", nil)
-
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
 }
