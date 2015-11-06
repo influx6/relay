@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gopkg.in/fsnotify.v1"
+	"github.com/go-fsnotify/fsnotify"
 
 	"github.com/influx6/assets"
 	"github.com/influx6/flux"
