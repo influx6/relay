@@ -22,6 +22,7 @@ func RegisterDefaultPlugins(pm *PluginManager) {
 	addGoFriday(pm)
 	addGoStaticBundle(pm)
 	addJSWatchBuild(pm)
+	addJsClient(pm)
 	addWatchBuildRun(pm)
 	addCommander(pm)
 }
@@ -195,7 +196,9 @@ func addJSWatchBuild(pm *PluginManager) {
 		})
 
 		jsbuild.React(func(root flux.Reactor, err error, _ interface{}) {
-			fmt.Printf("--> Js.client.Build complete: Dir: %s \n -----> Error: %s \n", clientdir, err)
+			if err != nil {
+				fmt.Printf("--> Js.client.Build complete: Dir: %s \n -----> Error: %s \n", clientdir, err)
+			}
 		}, true)
 
 		fmt.Printf("--> Initializing File Watcher using js package dependecies at %d\n", len(packages))
@@ -494,6 +497,88 @@ func addCommander(pm *PluginManager) {
 		flux.GoDefer("CommandWatch:kill", func() {
 			<-c
 			watcher.Close()
+		})
+	})
+}
+
+func addJsClient(pm *PluginManager) {
+	//these are internally used for js building
+	pm.Add("jsClients", func(config *BuildConfig, options Plugins, c chan bool) {
+		for _, pkg := range options.Args {
+			var pg Plugins
+			pg.Config = make(PluginConfig)
+			pg.Tag = "jsClient"
+			pg.Config["package"] = pkg
+			pg.Args = nil
+			pm.Activate(pg, config, c)
+		}
+	})
+
+	pm.Add("jsClient", func(config *BuildConfig, options Plugins, c chan bool) {
+		pkg := options.Config["package"]
+
+		_, jsName := filepath.Split(pkg)
+
+		pkgs := append([]string{}, pkg)
+		packages, err := assets.GetAllPackageLists(pkgs)
+
+		if err != nil {
+			panic(err)
+		}
+
+		dir, err := assets.GetPackageDir(pkg)
+
+		if err != nil {
+			panic(err)
+		}
+
+		jsbuild := builders.JSLauncher(builders.JSBuildConfig{
+			Package:  pkg,
+			Folder:   dir,
+			FileName: jsName,
+			Tags:     options.Args,
+			Verbose:  config.Client.UseVerbose,
+		})
+
+		jsbuild.React(func(root flux.Reactor, err error, _ interface{}) {
+			if err != nil {
+				fmt.Printf("--> Js.client.Build complete: Dir: %s \n -----> Error: %s \n", dir, err)
+			}
+		}, true)
+
+		watcher := fs.WatchSet(fs.WatchSetConfig{
+			Path: packages,
+			Validator: func(base string, info os.FileInfo) bool {
+				if strings.Contains(base, ".git") {
+					return false
+				}
+
+				if info != nil && info.IsDir() {
+					return true
+				}
+
+				if filepath.Ext(base) != ".go" {
+					return false
+				}
+
+				return true
+			},
+		})
+
+		watcher.React(flux.SimpleMuxer(func(root flux.Reactor, data interface{}) {
+			if ev, ok := data.(fsnotify.Event); ok {
+				fmt.Printf("--> Client:File as changed: %+s\n", ev.String())
+			}
+		}), true)
+
+		watcher.Bind(jsbuild, true)
+
+		jsbuild.Send(true)
+
+		flux.GoDefer("jsClient:kill", func() {
+			<-c
+			watcher.Close()
+			jsbuild.Close()
 		})
 	})
 }
