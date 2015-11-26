@@ -96,12 +96,27 @@ func addWatchBuildRun(pm *PluginManager) {
 		fmt.Printf("--> Retrieved package directories %s \n", config.Package)
 
 		goget := builders.GoInstallerWith("./")
+		goget.React(func(root flux.Reactor, err error, data interface{}) {
+			if err != nil {
+				fmt.Printf("---> goget.Error occured: %s\n", err)
+			} else {
+				fmt.Printf("--> Sending signal for 'go get'\n")
+			}
+		}, true)
 
 		buildbin := builders.BinaryBuildLauncher(builders.BinaryBuildConfig{
 			Path:    binDir,
 			Name:    binName,
 			RunArgs: config.BinArgs,
 		})
+
+		buildbin.React(func(root flux.Reactor, err error, data interface{}) {
+			if err != nil {
+				fmt.Printf("---> buildbin.Error occured: %s\n", err)
+			} else {
+				fmt.Printf("--> Building Binary")
+			}
+		}, true)
 
 		goget.Bind(buildbin, true)
 
@@ -134,16 +149,19 @@ func addWatchBuildRun(pm *PluginManager) {
 			},
 		})
 
-		watcher.React(flux.SimpleMuxer(func(root flux.Reactor, data interface{}) {
-			if ev, ok := data.(fsnotify.Event); ok {
-				fmt.Printf("--> File as changed: %+s\n", ev.String())
+		watcher.React(func(root flux.Reactor, err error, data interface{}) {
+			if err != nil {
+				fmt.Printf("---> watcher.Error occured: %s\n", err)
+			} else {
+				if ev, ok := data.(fsnotify.Event); ok {
+					fmt.Printf("--> File as changed: %+s\n", ev.String())
+				}
 			}
-		}), true)
+		}, true)
 
 		watcher.Bind(buildbin, true)
 		watcher.Bind(goget, true)
 
-		fmt.Printf("--> Sending signal for 'go get'\n")
 		//run go installer
 		goget.Send(true)
 
