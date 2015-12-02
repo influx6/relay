@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -369,6 +370,7 @@ func addGoStaticBundle(pm *PluginManager) {
 		outDir := options.Config["out"]
 		packageName := options.Config["package"]
 		fileName := options.Config["file"]
+		ignore := options.Config["ignore"]
 		absDir := filepath.Join(pwd, inDir)
 		absFile := filepath.Join(pwd, outDir, fileName+".go")
 
@@ -405,6 +407,12 @@ func addGoStaticBundle(pm *PluginManager) {
 			}
 		}
 
+		var ignoreReg *regexp.Regexp
+
+		if ignore != "" {
+			ignoreReg = regexp.MustCompile(ignore)
+		}
+
 		gostatic, err := builders.BundleAssets(&assets.BindFSConfig{
 			InDir:           inDir,
 			OutDir:          outDir,
@@ -413,6 +421,7 @@ func addGoStaticBundle(pm *PluginManager) {
 			Gzipped:         gzip,
 			NoDecompression: nodcom,
 			Production:      prod,
+			Ignore:          ignoreReg,
 		})
 
 		if err != nil {

@@ -179,10 +179,7 @@ var buildCommand = &cobra.Command{
 		var kill = make(chan bool)
 
 		for _, mbo := range config.Plugins {
-			if mbo.Tag == "goStatic" {
-				config.BuildPlugin.Activate(mbo, config, kill)
-				continue
-			}
+			config.BuildPlugin.Activate(mbo, config, kill)
 		}
 
 		config.BuildPlugin.Activate(Plugins{Tag: "builder"}, config, kill)
