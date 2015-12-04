@@ -421,7 +421,6 @@ func addGoStaticBundle(pm *PluginManager) {
 			Gzipped:         gzip,
 			NoDecompression: nodcom,
 			Production:      prod,
-			Ignore:          ignoreReg,
 		})
 
 		if err != nil {
@@ -458,6 +457,12 @@ func addGoStaticBundle(pm *PluginManager) {
 		//create the file watcher
 		watcher := fs.Watch(fs.WatchConfig{
 			Path: absDir,
+			Validator: func(path string, info os.FileInfo) bool {
+				if ignoreReg != nil && ignoreReg.MatchString(path) {
+					return false
+				}
+				return true
+			},
 		})
 
 		// create the command runner set to run the args
